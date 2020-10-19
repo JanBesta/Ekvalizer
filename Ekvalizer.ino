@@ -50,8 +50,8 @@ uint8_t startIndex = 0;
 CRGB ledky[pocetLED];
 
 
-LiquidCrystal lcd(12, 11, 5, 4, 3, 2); 
 
+// hlavicky funkci
 void basy1();
 void basy2();
 void basy3();
@@ -65,7 +65,7 @@ void setup()
   Serial.begin(57600);
   FastLED.addLeds<WS2812B,PINproLEDky, GRB>(ledky,pocetLED);
   Audio.Init();//Init module
-  lcd.begin(16, 2);
+
   analogWrite(9,20);
   pinMode(STROBE,OUTPUT);
   pinMode(RESET,OUTPUT); 
@@ -77,20 +77,22 @@ void loop()
                           //Frequency(Hz):          63  160  400  1K  2.5K  6.25K  16K
                           //hodnotaFrekvence[]:      0    1    2    3    4    5    6  
 
+
+  //omezeni hodnot aby byly jen kladne; mapovani, aby u neaktivniho pasku nesvitilo treba 5 ledek a aby hodnota odpovidala jedne ledce; a nasledne debugovani s vypisem hodnot
   for (int i = 0;i<7;i++){
     hodnotafrekvence[i]=constrain(hodnotafrekvence[i],0,1023);
     frekvence[i]=map(hodnotafrekvence[i],145,1023,0,30);
     Serial.print(hodnotafrekvence[i]);//used for debugging and Freq choosing
     Serial.print(" ");
   }
-
+  //znovu vypis ale uz mapovanych hodnot
   for(int i=0;i<=6;i++)
   {
     Serial.print(frekvence[i]);
     Serial.print(" ");
   }
   Serial.println(" ");
-
+  //FUNKCE S TECKOU (PEAKEM) JE: basy1
   basy1();
   basy2();
   basy3();
@@ -98,30 +100,38 @@ void loop()
   stredy2();
   vysky1();
 }
-
+//TATO FUNKCE JE S PEAKEM
 void basy1()
 {
+  //naprogramovani ktere ledky maji svitit (vizualni zobrazeni je az na konci fce) podle ctene hodnoty frekvence)
   for(int i=0;i<=frekvence[0];i++)
     {
-      ledky[i] = CHSV(140,255,150);
-      
+      //nastaveni barvy,saturac a jasu
+      ledky[i] = CHSV(140,255,150); // cervena
+
+      // podminka, ktera mi nastavi peak na nejvyssi hodnotu pokud je vyssi nez predtim (+1 protoze by se mi prekryvaly modra a cerevena
       if(poslednipeak<i)
         poslednipeak=i+1;
-        
+
+      //toto by melo nastavit rychlost padani tecky
       CoXmillis=millis()%8;
-      
+
+      //podminka, ktera dela padani tecky
       if(CoXmillis==0)
       {
         poslednipeak--;
       }
-      
-      ledky[poslednipeak]=CHSV(0,255,150);
 
+      //rozsviceni na cervenou barvu peaku
+      ledky[poslednipeak]=CHSV(0,255,150); //cervena
+
+      //1. for - zhasina ledky mezi peakem a LEDkami, ktere jezdi podle hodnoty; 2. for - zhasina od peaku do konce pasku (+1 protoze by mi jinak zhasl i ten peak)
       for(int i=frekvence[0];i<poslednipeak;i++)
         ledky[i] = CHSV(0,0,0);
       for(int i=poslednipeak+1;i<=30;i++)
         ledky[i] = CHSV(0,0,0);
     }
+// TOTO TEPRVE ZOBRAZI VIZUALNE BARVY    
 FastLED.show();
 }
 
