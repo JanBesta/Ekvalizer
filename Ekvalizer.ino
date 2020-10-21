@@ -31,8 +31,8 @@
 
 #include <LiquidCrystal.h> 
 
-Analyzer Audio = Analyzer(6,7,0);//Strobe pin ->4  RST pin ->5 Analog Pin ->0
-//Analyzer Audio = Analyzer();//Strobe->4 RST->5 Analog->0
+Analyzer Audio = Analyzer(12,13,0);//Strobe pin ->12  RST pin ->13 Analog Pin ->0
+//Analyzer Audio = Analyzer();//Strobe->12 RST->13 Analog->0
 //Version 1.3 for Spectrum analyzer
 //Please download the lastest library file
 
@@ -40,12 +40,13 @@ Analyzer Audio = Analyzer(6,7,0);//Strobe pin ->4  RST pin ->5 Analog Pin ->0
 #define pocetLED 180
 #define STROBE 4
 #define RESET 5
-
+//toto definuje,kdy se podminka aktivuje
+#define padani 800
 
 
 int hodnotafrekvence[7], frekvence[7];
-int poslednipeak=0, CoXmillis;
-uint8_t startIndex = 0;
+int poslednipeak=0;
+
 
 CRGB ledky[pocetLED];
 
@@ -103,34 +104,34 @@ void loop()
 //TATO FUNKCE JE S PEAKEM
 void basy1()
 {
+  unsigned int aktualniMillis, predchoziMillis=0;
   //naprogramovani ktere ledky maji svitit (vizualni zobrazeni je az na konci fce) podle ctene hodnoty frekvence)
   for(int i=0;i<=frekvence[0];i++)
     {
-      //nastaveni barvy,saturac a jasu
-      ledky[i] = CHSV(140,255,150); // cervena
+      //nastaveni barvy,saturace a jasu
+      ledky[i] = CHSV(140,255,150); // azurove modra
 
       // podminka, ktera mi nastavi peak na nejvyssi hodnotu pokud je vyssi nez predtim (+1 protoze by se mi prekryvaly modra a cerevena
       if(poslednipeak<i)
         poslednipeak=i+1;
 
-      //toto by melo nastavit rychlost padani tecky
-      CoXmillis=millis()%8;
-
+      //toto zaručí padání ledky, bojužel momentálně nedokážu ovlivnit rychlost
+      aktualniMillis=millis();
       //podminka, ktera dela padani tecky
-      if(CoXmillis==0)
+      if(aktualniMillis-predchoziMillis>padani)
       {
         poslednipeak--;
+        predchoziMillis=aktualniMillis;
       }
-
-      //rozsviceni na cervenou barvu peaku
       ledky[poslednipeak]=CHSV(0,255,150); //cervena
-
       //1. for - zhasina ledky mezi peakem a LEDkami, ktere jezdi podle hodnoty; 2. for - zhasina od peaku do konce pasku (+1 protoze by mi jinak zhasl i ten peak)
       for(int i=frekvence[0];i<poslednipeak;i++)
         ledky[i] = CHSV(0,0,0);
       for(int i=poslednipeak+1;i<=30;i++)
         ledky[i] = CHSV(0,0,0);
     }
+    //rozsviceni na cervenou barvu peaku
+      
 // TOTO TEPRVE ZOBRAZI VIZUALNE BARVY    
 FastLED.show();
 }
@@ -138,6 +139,7 @@ FastLED.show();
 
 void basy2()
 {
+  unsigned int aktualniMillis, predchoziMillis=0;
   for(int i=30;i<=frekvence[1]+30;i++)
     {
       ledky[i] = CHSV(170,255,150);
@@ -150,6 +152,7 @@ FastLED.show();
 
 void basy3()
 {
+  unsigned int aktualniMillis, predchoziMillis=0;
   for(int i=60;i<=frekvence[2]+60;i++)
     {
       ledky[i] = CHSV(100,255,150);
@@ -162,6 +165,7 @@ FastLED.show();
 
 void stredy1()
 {
+  unsigned int aktualniMillis, predchoziMillis=0;
   for(int i=90;i<=frekvence[3]+90;i++)
     {
       ledky[i] = CHSV(200,255,150);
@@ -174,6 +178,7 @@ FastLED.show();
 
 void stredy2()
 {
+  unsigned int aktualniMillis, predchoziMillis=0;
   for(int i=120;i<=frekvence[4]+120;i++)
     {
       ledky[i] = CHSV(50,255,150);
@@ -186,6 +191,7 @@ FastLED.show();
 
 void vysky1()
 {
+  unsigned int aktualniMillis, predchoziMillis=0;
   for(int i=150;i<=frekvence[5]+150;i++)
     {
       ledky[i] = CHSV(20,255,150);
