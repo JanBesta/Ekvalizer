@@ -41,7 +41,7 @@ Analyzer Audio = Analyzer(12,13,0);//Strobe pin ->12  RST pin ->13 Analog Pin ->
 #define STROBE 4
 #define RESET 5
 //toto definuje,kdy se podminka aktivuje
-#define padani 800
+#define padani 50
 
 
 int hodnotafrekvence[7], frekvence[7];
