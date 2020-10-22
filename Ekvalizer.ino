@@ -40,6 +40,7 @@ Analyzer Audio = Analyzer(12,13,0);//Strobe pin ->12  RST pin ->13 Analog Pin ->
 #define pocetLED 180
 #define STROBE 4
 #define RESET 5
+#define jas 150
 #define padani 150
 
 
@@ -103,7 +104,7 @@ void loop()
     Serial.print(" ");
   }
   Serial.println(" ");
-
+  //FUNKCE S TECKOU (PEAKEM) JE: basy1
   basy1();
   basy2();
   basy3();
@@ -116,21 +117,21 @@ void basy1()
   //naprogramovani ktere ledky maji svitit (vizualni zobrazeni je az na konci fce) podle ctene hodnoty frekvence)
   for(int i=0;i<=frekvence[0];i++)
     {
-      //nastaveni barvy - +6*i znamená, že se podle i posune barva => barva vyřešena,saturace a jasu
-      ledky[i] = CHSV(140+6*i,255,150); // azurove modra
+      //nastaveni barvy,saturace a jasu
+      ledky[i] = CHSV(140+6*i,255,jas); // azurove modra
 
-      //podminka, ktera mi nastavi peak na nejvyssi hodnotu pokud je vyssi nez predtim (+1 protoze by se mi prekryvaly modra a cerevena
+      // podminka, ktera mi nastavi peak na nejvyssi hodnotu pokud je vyssi nez predtim (+1 protoze by se mi prekryvaly modra a cerevena
       if(poslednipeak1<i)
         poslednipeak1=i+1;
-      
+
       aktualniMillis1=millis();
-      //podmínka, kdy zařídím padani tecky a jeji rychlost
+      //podminka, ktera dela padani tecky
       if(aktualniMillis1-predchoziMillis1>padani)
       {
         poslednipeak1--;
         predchoziMillis1=aktualniMillis1;
       }
-      ledky[poslednipeak1]=CHSV(0,255,150); //cervena
+      ledky[poslednipeak1]=CHSV(0,255,jas); //cervena
       //1. for - zhasina ledky mezi peakem a LEDkami, ktere jezdi podle hodnoty; 2. for - zhasina od peaku do konce pasku (+1 protoze by mi jinak zhasl i ten peak)
       for(int i=frekvence[0];i<poslednipeak1;i++)
         ledky[i] = CHSV(0,0,0);
@@ -147,11 +148,11 @@ void basy2()
 {
   for(int i=30;i<=frekvence[1]+30;i++)
     {
-      ledky[i] = CHSV(170+6*i,255,150);
+      ledky[i] = CHSV(170+6*i,255,jas);
 
       if(poslednipeak2<i)
         poslednipeak2=i+1;
-
+      
       aktualniMillis2=millis();
 
       if(aktualniMillis2-predchoziMillis2>padani)
@@ -159,7 +160,7 @@ void basy2()
         poslednipeak2--;
         predchoziMillis2=aktualniMillis2;
       }
-      ledky[poslednipeak2]=CHSV(0,255,150); //cervena
+      ledky[poslednipeak2]=CHSV(0,255,jas); //cervena
 
       for(int i=frekvence[1]+30;i<poslednipeak2;i++)
         ledky[i] = CHSV(0,0,0);
@@ -174,7 +175,7 @@ void basy3()
 {
   for(int i=60;i<=frekvence[2]+60;i++)
     {
-      ledky[i] = CHSV(100+6*i,255,150);
+      ledky[i] = CHSV(100+6*i,255,jas);
 
       if(poslednipeak3<i)
         poslednipeak3=i+1;
@@ -186,7 +187,7 @@ void basy3()
         poslednipeak3--;
         predchoziMillis3=aktualniMillis3;
       }
-      ledky[poslednipeak3]=CHSV(0,255,150); //cervena
+      ledky[poslednipeak3]=CHSV(0,255,jas); //cervena
 
       for(int i=frekvence[2]+60;i<poslednipeak3;i++)
         ledky[i] = CHSV(0,0,0);
@@ -201,7 +202,7 @@ void stredy1()
 {
   for(int i=90;i<=frekvence[3]+90;i++)
     {
-      ledky[i] = CHSV(200+6*i,255,150);
+      ledky[i] = CHSV(200+6*i,255,jas);
 
       if(poslednipeak4<i)
         poslednipeak4=i+1;
@@ -213,7 +214,7 @@ void stredy1()
         poslednipeak4--;
         predchoziMillis4=aktualniMillis4;
       }
-      ledky[poslednipeak4]=CHSV(0,255,150); //cervena
+      ledky[poslednipeak4]=CHSV(0,255,jas); //cervena
 
       for(int i=frekvence[3]+90;i<poslednipeak4;i++)
         ledky[i] = CHSV(0,0,0);
@@ -228,7 +229,7 @@ void stredy2()
 {
   for(int i=120;i<=frekvence[4]+120;i++)
     {
-      ledky[i] = CHSV(50+6*i,255,150);
+      ledky[i] = CHSV(50+6*i,255,jas);
 
       if(poslednipeak5<i)
         poslednipeak5=i+1;
@@ -240,9 +241,9 @@ void stredy2()
         poslednipeak5--;
         predchoziMillis5=aktualniMillis5;
       }
-      ledky[poslednipeak5]=CHSV(0,255,150); //cervena
+      ledky[poslednipeak5]=CHSV(0,255,jas); //cervena
 
-      for(int i=frekvence[5]+120;i<poslednipeak5;i++)
+      for(int i=frekvence[4]+120;i<poslednipeak5;i++)
         ledky[i] = CHSV(0,0,0);
       for(int i=poslednipeak5+1;i<=150;i++)
         ledky[i] = CHSV(0,0,0);
@@ -255,7 +256,7 @@ void vysky1()
 {
   for(int i=150;i<=frekvence[5]+150;i++)
     {
-      ledky[i]=CHSV(20+6*i,255,150);
+      ledky[i]=CHSV(20+6*i,255,jas);
 
         if(poslednipeak6<i)
         poslednipeak6=i+1;
@@ -267,7 +268,7 @@ void vysky1()
         poslednipeak6--;
         predchoziMillis6=aktualniMillis6;
       }
-      ledky[poslednipeak6]=CHSV(0,255,150); //cervena
+      ledky[poslednipeak6]=CHSV(0,255,jas); //cervena
 
       for(int i=frekvence[5]+150;i<poslednipeak6;i++)
         ledky[i] = CHSV(0,0,0);
