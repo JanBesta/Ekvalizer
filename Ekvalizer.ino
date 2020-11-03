@@ -40,11 +40,13 @@ Analyzer Audio = Analyzer(12,13,0);//Strobe pin ->12  RST pin ->13 Analog Pin ->
 #define pocetLED 180
 #define STROBE 4
 #define RESET 5
-#define jas 150
-#define padani 150
 
 
 int hodnotafrekvence[7], frekvence[7];
+int jas;
+int padani;
+int barevnyIndex1, barevnyIndex2, barevnyIndex3, barevnyIndex4, barevnyIndex5, barevnyIndex6;
+
 int poslednipeak1=0, aktualniPeak;
 unsigned int aktualniMillis1, predchoziMillis1=0;
 int poslednipeak2=0;
@@ -58,10 +60,7 @@ unsigned int aktualniMillis5, predchoziMillis5=0;
 int poslednipeak6=0;
 unsigned int aktualniMillis6, predchoziMillis6=0;
 
-
 CRGB ledky[pocetLED];
-
-
 
 // hlavicky funkci
 void basy1();
@@ -89,7 +88,6 @@ void loop()
                           //Frequency(Hz):          63  160  400  1K  2.5K  6.25K  16K
                           //hodnotaFrekvence[]:      0    1    2    3    4    5    6  
 
-
   //omezeni hodnot aby byly jen kladne; mapovani, aby u neaktivniho pasku nesvitilo treba 5 ledek a aby hodnota odpovidala jedne ledce; a nasledne debugovani s vypisem hodnot
   for (int i = 0;i<7;i++){
     hodnotafrekvence[i]=constrain(hodnotafrekvence[i],0,1023);
@@ -104,21 +102,35 @@ void loop()
     Serial.print(" ");
   }
   Serial.println(" ");
-  //FUNKCE S TECKOU (PEAKEM) JE: basy1
+  jas=map(analogRead(A3),50,900,255,0);
+  if(jas<=0)
+    jas=0;
+  barevnyIndex1=map(analogRead(A1),50,900,8,0);
+  padani=map(analogRead(A2),50,900,250,50);
+  Serial.println(jas);
+  Serial.println(barevnyIndex1);
+  Serial.println(padani);
+  
   basy1();
   basy2();
   basy3();
   stredy1();
   stredy2();
   vysky1();
+  
 }
 void basy1()
 {
+  jas=map(analogRead(A3),50,900,255,0);
+  if(jas<=0)
+    jas=0;
+  padani=map(analogRead(A2),50,900,250,50);
+  barevnyIndex1=map(analogRead(A1),50,900,8,0);
   //naprogramovani ktere ledky maji svitit (vizualni zobrazeni je az na konci fce) podle ctene hodnoty frekvence)
   for(int i=0;i<=frekvence[0];i++)
     {
       //nastaveni barvy,saturace a jasu
-      ledky[i] = CHSV(140+6*i,255,jas); // azurove modra
+      ledky[i] = CHSV(100+(barevnyIndex1*i),255,jas);
 
       // podminka, ktera mi nastavi peak na nejvyssi hodnotu pokud je vyssi nez predtim (+1 protoze by se mi prekryvaly modra a cerevena
       if(poslednipeak1<i)
@@ -146,9 +158,14 @@ FastLED.show();
 
 void basy2()
 {
+  jas=map(analogRead(A3),50,900,255,0);
+  if(jas<=0)
+    jas=0;
+  padani=map(analogRead(A2),50,900,250,50);
+  barevnyIndex2=map(analogRead(A1),50,900,8,0);
   for(int i=30;i<=frekvence[1]+30;i++)
     {
-      ledky[i] = CHSV(170+6*i,255,jas);
+      ledky[i] = CHSV(100+barevnyIndex2*(i-30),255,jas);
 
       if(poslednipeak2<i)
         poslednipeak2=i+1;
@@ -173,9 +190,14 @@ FastLED.show();
 
 void basy3()
 {
+  jas=map(analogRead(A3),50,900,255,0);
+  if(jas<=0)
+    jas=0;
+  padani=map(analogRead(A2),50,900,250,50);
+  barevnyIndex3=map(analogRead(A1),50,900,8,0);
   for(int i=60;i<=frekvence[2]+60;i++)
     {
-      ledky[i] = CHSV(100+6*i,255,jas);
+      ledky[i] = CHSV(100+barevnyIndex3*(i-60),255,jas);
 
       if(poslednipeak3<i)
         poslednipeak3=i+1;
@@ -200,9 +222,14 @@ FastLED.show();
 
 void stredy1()
 {
+  jas=map(analogRead(A3),50,900,255,0);
+  if(jas<=0)
+    jas=0;
+  padani=map(analogRead(A2),50,900,250,50);
+  barevnyIndex4=map(analogRead(A1),50,900,8,0);
   for(int i=90;i<=frekvence[3]+90;i++)
     {
-      ledky[i] = CHSV(200+6*i,255,jas);
+      ledky[i] = CHSV(100+barevnyIndex4*(i-90),255,jas);
 
       if(poslednipeak4<i)
         poslednipeak4=i+1;
@@ -227,9 +254,14 @@ FastLED.show();
 
 void stredy2()
 {
+  jas=map(analogRead(A3),50,900,255,0);
+  if(jas<=0)
+    jas=0;
+  padani=map(analogRead(A2),50,900,250,50);
+  barevnyIndex5=map(analogRead(A1),50,900,8,0);
   for(int i=120;i<=frekvence[4]+120;i++)
     {
-      ledky[i] = CHSV(50+6*i,255,jas);
+      ledky[i] = CHSV(100+barevnyIndex5*(i-120),255,jas);
 
       if(poslednipeak5<i)
         poslednipeak5=i+1;
@@ -254,9 +286,14 @@ FastLED.show();
 
 void vysky1()
 {
+  jas=map(analogRead(A3),50,900,255,0);
+  if(jas<=0)
+    jas=0;
+  padani=map(analogRead(A2),50,900,250,50);
+  barevnyIndex6=map(analogRead(A1),50,900,8,0);
   for(int i=150;i<=frekvence[5]+150;i++)
     {
-      ledky[i]=CHSV(20+6*i,255,jas);
+      ledky[i]=CHSV(100+barevnyIndex6*(i-150),255,jas);
 
         if(poslednipeak6<i)
         poslednipeak6=i+1;
