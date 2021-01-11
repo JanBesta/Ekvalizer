@@ -1,38 +1,10 @@
-#include<math.h>
-
-#include <bitswap.h>
-#include <chipsets.h>
-#include <color.h>
-#include <colorpalettes.h>
-#include <colorutils.h>
-#include <controller.h>
-#include <cpp_compat.h>
-#include <dmx.h>
 #include <FastLED.h>
-#include <fastled_config.h>
-#include <fastled_delay.h>
-#include <fastled_progmem.h>
-#include <fastpin.h>
-#include <fastspi.h>
-#include <fastspi_bitbang.h>
-#include <fastspi_dma.h>
-#include <fastspi_nop.h>
-#include <fastspi_ref.h>
-#include <fastspi_types.h>
-#include <hsv2rgb.h>
-#include <led_sysdefs.h>
-#include <lib8tion.h>
-#include <noise.h>
-#include <pixelset.h>
-#include <pixeltypes.h>
-#include <platforms.h>
-#include <power_mgt.h>
+
+#include <math.h>
+
 #include <AudioAnalyzer.h>
 
-
-
-#include <LiquidCrystal.h> 
-
+#include <LiquidCrystal_I2C.h>
 
 
 Analyzer Audio = Analyzer(12,13,0);//Strobe pin ->12  RST pin ->13 Analog Pin ->0
@@ -44,14 +16,15 @@ Analyzer Audio = Analyzer(12,13,0);//Strobe pin ->12  RST pin ->13 Analog Pin ->
 #define STROBE 4
 #define RESET 5
 
-//promenne pro ekvalizer
+//Promenne pro ekvalizer
 
 int hodnotafrekvence[7], frekvence[7], frekvence1[7], frekvence2[7];
 int jas;
 int padani;
-int barevnyIndex1, barevnyIndex2, barevnyIndex3, barevnyIndex4, barevnyIndex5, barevnyIndex6;
-int barva1, barva2, barva3, barva4, barva5, barva6;
-int volba=0;
+int barevnyIndex;
+int barva;
+int barvaPeak;
+int volba=1, analogReadCounter;
 
 int poslednipeak1=0;
 unsigned int aktualniMillis1, predchoziMillis1=0;
@@ -117,31 +90,44 @@ void stredy21();
 void stredy22();
 void vysky21();
 
+void animace();
 void lcd1();
 
 void tlacitko1();
 void tlacitko2();
 
 
-//LCD displej
-const int rs = 10, en = 11, d4 = 7, d5 = 6, d6 = 5, d7 = 4;
-LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+//LCD displej s I2C prevodnikem
+LiquidCrystal_I2C lcd(0x27,20,4);
 
-
+//animace
+uint8_t startIndex = 0;
 
 void setup()
 {
   Serial.begin(57600);
-  lcd.begin(16, 2);
-  analogWrite(9,110);
   FastLED.addLeds<WS2812B,PINproLEDky, GRB>(ledky,pocetLED);
   Audio.Init();//Init module
-
-  analogWrite(9,20);
   pinMode(STROBE,OUTPUT);
-  pinMode(RESET,OUTPUT); 
-  attachInterrupt(0, tlacitko1, RISING);
-  attachInterrupt(1, tlacitko2, RISING);
+  pinMode(RESET,OUTPUT);
+  
+  attachInterrupt(digitalPinToInterrupt(2),tlacitko1,RISING);
+  attachInterrupt(digitalPinToInterrupt(3),tlacitko2,RISING);
+  
+  pinMode(A0,INPUT);
+  pinMode(A1,INPUT);
+  pinMode(A2,INPUT);
+  pinMode(A3,INPUT);
+  pinMode(A4,INPUT);
+  pinMode(A5,INPUT);
+
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0,0);
+  lcd.print(" Prave probiha:");
+  lcd.setCursor(1,1);
+  lcd.print("Test LED Pasku");
+  
   for(int i = 0;i<30;i++)
   {
     ledky[i] = CHSV(0,255,150);
@@ -178,21 +164,24 @@ void setup()
     delay(20);
     FastLED.show();
   }
-delay(100);
+  delay(100);
   for(int i = 0;i<180;i++)
   {
     ledky[i] = CHSV(0,0,0);
   }
   delay(100);
   FastLED.show();
+  
+  lcd.clear();
+  delay(1000);
 }
 
 void loop()
 {
   Audio.ReadFreq(hodnotafrekvence);//Return 7 values of 7 bands pass filter
-                          //Frequency(Hz):          63  160  400  1K  2.5K  6.25K  16K
+                          //Frequency(Hz):          63  160  400  1k  2.5k  6.25k  16k
                           //hodnotaFrekvence[]:      0    1    2    3    4    5    6  
-
+  analogReadCounter=0;
   //omezeni hodnot aby byly jen kladne; mapovani, aby u neaktivniho pasku nesvitilo treba 5 ledek a aby hodnota odpovidala jedne ledce; a nasledne debugovani s vypisem hodnot
   for (int i = 0;i<7;i++)
   {
@@ -239,31 +228,50 @@ void loop()
   }
   Serial.println(" ");
 
-
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
+  
+  jas=map(analogRead(A1),50,900,255,0);
+  if(jas<0)
     jas=0;
-  barevnyIndex1=map(analogRead(A1),50,900,8,0);
-  padani=map(analogRead(A2),50,900,250,50);
-  barva1=map(analogRead(A4),50,900,255,0);
+  if(jas>255)
+    jas=255;
+  barva=map(analogRead(A2),50,900,255,0);
+  if(barva<0)
+    barva=0;
+  barevnyIndex=map(analogRead(A3),50,900,8,0);
+  if(barevnyIndex<0)
+    barevnyIndex=0;
+  padani=map(analogRead(A4),50,900,250,10);
+  if(padani<10)
+    padani=10;
+  barvaPeak=map(analogRead(A5),50,900,250,0);
+  if(barvaPeak<0)
+    barvaPeak=0;
+
+  
   Serial.print("Jas: ");
   Serial.println(jas);
   Serial.print("BarvenyIndex: ");
-  Serial.println(barevnyIndex1);
+  Serial.println(barevnyIndex);
   Serial.print("Padani: ");
   Serial.println(padani);
-  Serial.print("Barva1: ");
-  Serial.println(barva1);
+  Serial.print("barva: ");
+  Serial.println(barva);
   Serial.print("volba: ");
   Serial.println(volba);
+  Serial.print("barvaPeak: ");
+  Serial.println(barvaPeak);
 
+  
   lcd1();
-
-    
 
   switch(volba)
   {
   case 0:
+  {
+    animace();
+  break;
+  }
+  case 1:
   {
     basy01();
     basy02();
@@ -273,7 +281,7 @@ void loop()
     vysky01();
    break;
    }
-   case 1:
+   case 2:
    {
      basy11();
      basy12();
@@ -283,7 +291,7 @@ void loop()
      vysky11();
    break;
    }
-   case 2:
+   case 3:
    {
     basy21();
     basy22();
@@ -303,31 +311,36 @@ void loop()
 void tlacitko1()
 {
   volba++;
+  if(volba>3)
+    volba=3;
 }
 
 void tlacitko2()
 {
-  volba--;  
+  volba--;
   if(volba<0)
     volba=0;
 }
 
+void animace()
+{
+  startIndex = startIndex + 8;
+  int barevnyIndex=startIndex;
+  for( int i = 0; i<pocetLED; i++) 
+  {
+  ledky[i] = ColorFromPalette(RainbowColors_p, barevnyIndex, jas);
+  barevnyIndex+=5;
+  }
+  FastLED.show();
+}
 
 void basy01()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex1=map(analogRead(A1),50,900,8,0);
-  barva1=map(analogRead(A4),50,900,255,0);
   //naprogramovani ktere ledky maji svitit (vizualni zobrazeni je az na konci fce) podle ctene hodnoty frekvence)
   for(int i=0;i<=frekvence[0];i++)
     {
       //nastaveni barvy,saturace a jasu
-      ledky[i] = CHSV(barva1+(barevnyIndex1*i),255,jas);
+      ledky[i] = CHSV(barva+(barevnyIndex*i),255,jas);
 
       // podminka, ktera mi nastavi peak na nejvyssi hodnotu pokud je vyssi nez predtim (+1 protoze by se mi prekryvaly modra a cerevena
       if(poslednipeak1<i)
@@ -340,7 +353,10 @@ void basy01()
         poslednipeak1--;
         predchoziMillis1=aktualniMillis1;
       }
-      ledky[poslednipeak1]=CHSV(0,255,jas); //cervena
+      
+      ledky[poslednipeak1]=CHSV(barvaPeak,255,jas);
+
+      
       //1. for - zhasina ledky mezi peakem a LEDkami, ktere jezdi podle hodnoty; 2. for - zhasina od peaku do konce pasku (+1 protoze by mi jinak zhasl i ten peak)
       for(int i=frekvence[0];i<poslednipeak1;i++)
         ledky[i] = CHSV(0,0,0);
@@ -355,17 +371,9 @@ FastLED.show();
 
 void basy02()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex2=map(analogRead(A1),50,900,8,0);
-  barva2=map(analogRead(A4),50,900,255,0);
   for(int i=30;i<=frekvence[1]+30;i++)
     {
-      ledky[i] = CHSV(barva2+barevnyIndex2*(i-30),255,jas);
+      ledky[i] = CHSV(barva+barevnyIndex*(i-30),255,jas);
 
       if(poslednipeak2<i)
         poslednipeak2=i+1;
@@ -377,7 +385,7 @@ void basy02()
         poslednipeak2--;
         predchoziMillis2=aktualniMillis2;
       }
-      ledky[poslednipeak2]=CHSV(0,255,jas); //cervena
+      ledky[poslednipeak2]=CHSV(barvaPeak,255,jas); 
 
       for(int i=frekvence[1]+30;i<poslednipeak2;i++)
         ledky[i] = CHSV(0,0,0);
@@ -390,17 +398,9 @@ FastLED.show();
 
 void basy03()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex3=map(analogRead(A1),50,900,8,0);
-  barva3=map(analogRead(A4),50,900,255,0);
   for(int i=60;i<=frekvence[2]+60;i++)
     {
-      ledky[i] = CHSV(barva3+barevnyIndex3*(i-60),255,jas);
+      ledky[i] = CHSV(barva+barevnyIndex*(i-60),255,jas);
 
       if(poslednipeak3<i)
         poslednipeak3=i+1;
@@ -412,7 +412,8 @@ void basy03()
         poslednipeak3--;
         predchoziMillis3=aktualniMillis3;
       }
-      ledky[poslednipeak3]=CHSV(0,255,jas); //cervena
+      
+      ledky[poslednipeak3]=CHSV(barvaPeak,255,jas); 
 
       for(int i=frekvence[2]+60;i<poslednipeak3;i++)
         ledky[i] = CHSV(0,0,0);
@@ -425,17 +426,9 @@ FastLED.show();
 
 void stredy01()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex4=map(analogRead(A1),50,900,8,0);
-  barva4=map(analogRead(A4),50,900,255,0);
   for(int i=90;i<=frekvence[3]+90;i++)
     {
-      ledky[i] = CHSV(barva4+barevnyIndex4*(i-90),255,jas);
+      ledky[i] = CHSV(barva+barevnyIndex*(i-90),255,jas);
 
       if(poslednipeak4<i)
         poslednipeak4=i+1;
@@ -447,7 +440,8 @@ void stredy01()
         poslednipeak4--;
         predchoziMillis4=aktualniMillis4;
       }
-      ledky[poslednipeak4]=CHSV(0,255,jas); //cervena
+      
+      ledky[poslednipeak4]=CHSV(barvaPeak,255,jas); 
 
       for(int i=frekvence[3]+90;i<poslednipeak4;i++)
         ledky[i] = CHSV(0,0,0);
@@ -460,17 +454,9 @@ FastLED.show();
 
 void stredy02()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex5=map(analogRead(A1),50,900,8,0);
-  barva5=map(analogRead(A4),50,900,255,0);
   for(int i=120;i<=frekvence[4]+120;i++)
     {
-      ledky[i] = CHSV(barva5+barevnyIndex5*(i-120),255,jas);
+      ledky[i] = CHSV(barva+barevnyIndex*(i-120),255,jas);
 
       if(poslednipeak5<i)
         poslednipeak5=i+1;
@@ -482,7 +468,8 @@ void stredy02()
         poslednipeak5--;
         predchoziMillis5=aktualniMillis5;
       }
-      ledky[poslednipeak5]=CHSV(0,255,jas); //cervena
+      
+      ledky[poslednipeak5]=CHSV(barvaPeak,255,jas);
 
       for(int i=frekvence[4]+120;i<poslednipeak5;i++)
         ledky[i] = CHSV(0,0,0);
@@ -492,20 +479,11 @@ void stredy02()
 FastLED.show();
 }
 
-
 void vysky01()
 {
-  jas=map(analogRead(A3),50,900,240,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex6=map(analogRead(A1),50,900,8,0);
-  barva6=map(analogRead(A4),50,900,255,0);
   for(int i=150;i<=frekvence[5]+150;i++)
     {
-      ledky[i]=CHSV(barva6+barevnyIndex6*(i-150),255,jas);
+      ledky[i]=CHSV(barva+barevnyIndex*(i-150),255,jas);
 
         if(poslednipeak6<i)
         poslednipeak6=i+1;
@@ -517,7 +495,8 @@ void vysky01()
         poslednipeak6--;
         predchoziMillis6=aktualniMillis6;
       }
-      ledky[poslednipeak6]=CHSV(0,255,jas); //cervena
+      
+      ledky[poslednipeak6]=CHSV(barvaPeak,255,jas); 
 
       for(int i=frekvence[5]+150;i<poslednipeak6;i++)
         ledky[i] = CHSV(0,0,0);
@@ -529,17 +508,9 @@ FastLED.show();
 
 void basy11()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex1=map(analogRead(A1),50,900,8,0);
-  barva1=map(analogRead(A4),50,900,255,0);
-  for(int i=14;i<=frekvence1[0];i++)
+for(int i=14;i<=frekvence1[0];i++)
   {
-    ledky[i] = CHSV(barva1+(barevnyIndex1*i),255,jas);
+    ledky[i] = CHSV(barva+(barevnyIndex*i),255,jas);
 
     if(poslednipeak011<i)
         poslednipeak011=i+1;
@@ -551,7 +522,7 @@ void basy11()
         poslednipeak011--;
         predchoziMillis011=aktualniMillis011;
       }
-      ledky[poslednipeak011]=CHSV(0,255,jas); 
+      ledky[poslednipeak011]=CHSV(barvaPeak,255,jas); 
 
       for(int i=frekvence1[0];i<poslednipeak011;i++)
         ledky[i] = CHSV(0,0,0);
@@ -561,7 +532,7 @@ void basy11()
   
   for(int i=14;i>=frekvence2[0];i--)
   {
-    ledky[i] = CHSV(barva1+(barevnyIndex1*i),255,jas);
+    ledky[i] = CHSV(barva+(barevnyIndex*i),255,jas);
 
     if(poslednipeak012>i)
         poslednipeak012=i+1;
@@ -573,7 +544,7 @@ void basy11()
         poslednipeak012++;
         predchoziMillis012=aktualniMillis012;
       }
-      ledky[poslednipeak012]=CHSV(0,255,jas);
+      ledky[poslednipeak012]=CHSV(barvaPeak,255,jas);
 
       for(int i=frekvence2[0];i>poslednipeak012;i--)
         ledky[i] = CHSV(0,0,0);
@@ -586,17 +557,9 @@ FastLED.show();
 
 void basy12()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex2=map(analogRead(A1),50,900,8,0);
-  barva2=map(analogRead(A4),50,900,255,0);
   for(int i=44;i<=frekvence1[1]+30;i++)
   {
-    ledky[i] = CHSV(barva2+barevnyIndex2*(i-30),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex*(i-30),255,jas);
 
     if(poslednipeak111<i)
         poslednipeak111=i+1;
@@ -608,7 +571,7 @@ void basy12()
         poslednipeak111--;
         predchoziMillis111=aktualniMillis111;
       }
-      ledky[poslednipeak111]=CHSV(0,255,jas); 
+      ledky[poslednipeak111]=CHSV(barvaPeak,255,jas); 
 
       for(int i=frekvence1[1]+30;i<poslednipeak111;i++)
         ledky[i] = CHSV(0,0,0);
@@ -618,7 +581,7 @@ void basy12()
   
   for(int i=44;i>=frekvence2[1]+30;i--)
   {
-    ledky[i] = CHSV(barva2+barevnyIndex2*(i-30),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex*(i-30),255,jas);
 
     if(poslednipeak112>i)
         poslednipeak112=i+1;
@@ -630,7 +593,7 @@ void basy12()
         poslednipeak112++;
         predchoziMillis112=aktualniMillis112;
       }
-      ledky[poslednipeak112]=CHSV(0,255,jas);
+      ledky[poslednipeak112]=CHSV(barvaPeak,255,jas);
 
       for(int i=frekvence2[1]+30;i>poslednipeak112;i--)
         ledky[i] = CHSV(0,0,0);
@@ -642,17 +605,9 @@ FastLED.show();
 
 void basy13()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex3=map(analogRead(A1),50,900,8,0);
-  barva3=map(analogRead(A4),50,900,255,0);
   for(int i=74;i<=frekvence1[2]+60;i++)
   {
-    ledky[i] = CHSV(barva3+barevnyIndex3*(i-60),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex*(i-60),255,jas);
 
     if(poslednipeak211<i)
         poslednipeak211=i+1;
@@ -664,7 +619,7 @@ void basy13()
         poslednipeak211--;
         predchoziMillis211=aktualniMillis211;
       }
-      ledky[poslednipeak211]=CHSV(0,255,jas); 
+      ledky[poslednipeak211]=CHSV(barvaPeak,255,jas); 
 
       for(int i=frekvence1[2]+60;i<poslednipeak211;i++)
         ledky[i] = CHSV(0,0,0);
@@ -674,7 +629,7 @@ void basy13()
   
   for(int i=74;i>=frekvence2[2]+60;i--)
   {
-    ledky[i] = CHSV(barva3+barevnyIndex3*(i-60),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex*(i-60),255,jas);
 
     if(poslednipeak212>i)
         poslednipeak212=i+1;
@@ -686,7 +641,7 @@ void basy13()
         poslednipeak212++;
         predchoziMillis212=aktualniMillis212;
       }
-      ledky[poslednipeak212]=CHSV(0,255,jas);
+      ledky[poslednipeak212]=CHSV(barvaPeak,255,jas);
 
       for(int i=frekvence2[2]+60;i>poslednipeak212;i--)
         ledky[i] = CHSV(0,0,0);
@@ -698,17 +653,9 @@ FastLED.show();
 
 void stredy11()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex4=map(analogRead(A1),50,900,8,0);
-  barva4=map(analogRead(A4),50,900,255,0);
   for(int i=104;i<=frekvence1[3]+90;i++)
   {
-    ledky[i] = CHSV(barva4+barevnyIndex4*(i-90),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex*(i-90),255,jas);
 
     if(poslednipeak311<i)
         poslednipeak311=i+1;
@@ -720,7 +667,7 @@ void stredy11()
         poslednipeak311--;
         predchoziMillis311=aktualniMillis311;
       }
-      ledky[poslednipeak311]=CHSV(0,255,jas); 
+      ledky[poslednipeak311]=CHSV(barvaPeak,255,jas); 
 
       for(int i=frekvence1[3]+90;i<poslednipeak311;i++)
         ledky[i] = CHSV(0,0,0);
@@ -730,7 +677,7 @@ void stredy11()
   
   for(int i=104;i>=frekvence2[3]+90;i--)
   {
-    ledky[i] = CHSV(barva4+barevnyIndex4*(i-90),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex*(i-90),255,jas);
 
     if(poslednipeak312>i)
         poslednipeak312=i+1;
@@ -742,7 +689,7 @@ void stredy11()
         poslednipeak312++;
         predchoziMillis312=aktualniMillis312;
       }
-      ledky[poslednipeak312]=CHSV(0,255,jas);
+      ledky[poslednipeak312]=CHSV(barvaPeak,255,jas);
 
       for(int i=frekvence2[3]+90;i>poslednipeak312;i--)
         ledky[i] = CHSV(0,0,0);
@@ -754,17 +701,9 @@ FastLED.show();
 
 void stredy12()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex6=map(analogRead(A1),50,900,8,0);
-  barva6=map(analogRead(A4),50,900,255,0);
   for(int i=134;i<=frekvence1[4]+120;i++)
   {
-    ledky[i] = CHSV(barva5+barevnyIndex5*(i-120),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex*(i-120),255,jas);
 
     if(poslednipeak411<i)
         poslednipeak411=i+1;
@@ -776,7 +715,7 @@ void stredy12()
         poslednipeak411--;
         predchoziMillis411=aktualniMillis411;
       }
-      ledky[poslednipeak411]=CHSV(0,255,jas); 
+      ledky[poslednipeak411]=CHSV(barvaPeak,255,jas); 
 
       for(int i=frekvence1[4]+120;i<poslednipeak411;i++)
         ledky[i] = CHSV(0,0,0);
@@ -786,7 +725,7 @@ void stredy12()
   
   for(int i=134;i>=frekvence2[4]+120;i--)
   {
-    ledky[i] = CHSV(barva5+barevnyIndex5*(i-120),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex*(i-120),255,jas);
 
     if(poslednipeak412>i)
         poslednipeak412=i+1;
@@ -798,7 +737,7 @@ void stredy12()
         poslednipeak412++;
         predchoziMillis412=aktualniMillis412;
       }
-      ledky[poslednipeak412]=CHSV(0,255,jas);
+      ledky[poslednipeak412]=CHSV(barvaPeak,255,jas);
 
       for(int i=frekvence2[4]+120;i>poslednipeak412;i--)
         ledky[i] = CHSV(0,0,0);
@@ -810,17 +749,9 @@ FastLED.show();
 
 void vysky11()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex6=map(analogRead(A1),50,900,8,0);
-  barva6=map(analogRead(A4),50,900,255,0);
   for(int i=164;i<=frekvence1[5]+150;i++)
   {
-    ledky[i] = CHSV(barva6+barevnyIndex6*(i-150),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex*(i-150),255,jas);
 
     if(poslednipeak511<i)
         poslednipeak511=i+1;
@@ -832,7 +763,7 @@ void vysky11()
         poslednipeak511--;
         predchoziMillis511=aktualniMillis511;
       }
-      ledky[poslednipeak511]=CHSV(0,255,jas); 
+      ledky[poslednipeak511]=CHSV(barvaPeak,255,jas); 
 
       for(int i=frekvence1[5]+150;i<poslednipeak511;i++)
         ledky[i] = CHSV(0,0,0);
@@ -842,7 +773,7 @@ void vysky11()
   
   for(int i=164;i>=frekvence2[5]+150;i--)
   {
-    ledky[i] = CHSV(barva6+barevnyIndex6*(i-150),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex*(i-150),255,jas);
 
     if(poslednipeak512>i)
         poslednipeak512=i+1;
@@ -854,7 +785,7 @@ void vysky11()
         poslednipeak512++;
         predchoziMillis512=aktualniMillis512;
       }
-      ledky[poslednipeak512]=CHSV(0,255,jas);
+      ledky[poslednipeak512]=CHSV(barvaPeak,255,jas);
 
       for(int i=frekvence2[5]+150;i>poslednipeak512;i--)
         ledky[i] = CHSV(0,0,0);
@@ -866,19 +797,10 @@ FastLED.show();
 
 void basy21()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex1=map(analogRead(A1),50,900,8,0);
-  barva1=map(analogRead(A4),50,900,255,0);
-
   for(int i=0;i<=frekvence[0];i++)
     {
 
-      ledky[i] = CHSV(0+barva1+(barevnyIndex1*i),255,jas);
+      ledky[i] = CHSV(0+barva+(barevnyIndex*i),255,jas);
 
 
       if(poslednipeak1<i)
@@ -891,7 +813,7 @@ void basy21()
         poslednipeak1--;
         predchoziMillis1=aktualniMillis1;
       }
-      ledky[poslednipeak1]=CHSV(50,255,jas); //cervena
+      ledky[poslednipeak1]=CHSV(50+barvaPeak,255,jas); //cervena
 
       for(int i=frekvence[0];i<poslednipeak1;i++)
         ledky[i] = CHSV(0,0,0);
@@ -905,17 +827,9 @@ FastLED.show();
 
 void basy22()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex2=map(analogRead(A1),50,900,8,0);
-  barva2=map(analogRead(A4),50,900,255,0);
   for(int i=30;i<=frekvence[1]+30;i++)
     {
-      ledky[i] = CHSV(60+barva2+barevnyIndex2*(i-30),255,jas);
+      ledky[i] = CHSV(60+barva+barevnyIndex*(i-30),255,jas);
 
       if(poslednipeak2<i)
         poslednipeak2=i+1;
@@ -927,7 +841,7 @@ void basy22()
         poslednipeak2--;
         predchoziMillis2=aktualniMillis2;
       }
-      ledky[poslednipeak2]=CHSV(100,255,jas); //cervena
+      ledky[poslednipeak2]=CHSV(100+barvaPeak,255,jas); //cervena
 
       for(int i=frekvence[1]+30;i<poslednipeak2;i++)
         ledky[i] = CHSV(0,0,0);
@@ -940,17 +854,9 @@ FastLED.show();
 
 void basy23()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex3=map(analogRead(A1),50,900,8,0);
-  barva3=map(analogRead(A4),50,900,255,0);
   for(int i=60;i<=frekvence[2]+60;i++)
     {
-      ledky[i] = CHSV(100+barva3+barevnyIndex3*(i-60),255,jas);
+      ledky[i] = CHSV(100+barva+barevnyIndex*(i-60),255,jas);
 
       if(poslednipeak3<i)
         poslednipeak3=i+1;
@@ -962,7 +868,7 @@ void basy23()
         poslednipeak3--;
         predchoziMillis3=aktualniMillis3;
       }
-      ledky[poslednipeak3]=CHSV(200,255,jas); //cervena
+      ledky[poslednipeak3]=CHSV(200+barvaPeak,255,jas); //cervena
 
       for(int i=frekvence[2]+60;i<poslednipeak3;i++)
         ledky[i] = CHSV(0,0,0);
@@ -975,17 +881,9 @@ FastLED.show();
 
 void stredy21()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex4=map(analogRead(A1),50,900,8,0);
-  barva4=map(analogRead(A4),50,900,255,0);
   for(int i=90;i<=frekvence[3]+90;i++)
     {
-      ledky[i] = CHSV(130+barva4+barevnyIndex4*(i-90),255,jas);
+      ledky[i] = CHSV(130+barva+barevnyIndex*(i-90),255,jas);
 
       if(poslednipeak4<i)
         poslednipeak4=i+1;
@@ -997,7 +895,7 @@ void stredy21()
         poslednipeak4--;
         predchoziMillis4=aktualniMillis4;
       }
-      ledky[poslednipeak4]=CHSV(30,255,jas); //cervena
+      ledky[poslednipeak4]=CHSV(30+barvaPeak,255,jas); //cervena
 
       for(int i=frekvence[3]+90;i<poslednipeak4;i++)
         ledky[i] = CHSV(0,0,0);
@@ -1010,17 +908,9 @@ FastLED.show();
 
 void stredy22()
 {
-  jas=map(analogRead(A3),50,900,255,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex5=map(analogRead(A1),50,900,8,0);
-  barva5=map(analogRead(A4),50,900,255,0);
   for(int i=120;i<=frekvence[4]+120;i++)
     {
-      ledky[i] = CHSV(200+barva5+barevnyIndex5*(i-120),255,jas);
+      ledky[i] = CHSV(200+barva+barevnyIndex*(i-120),255,jas);
 
       if(poslednipeak5<i)
         poslednipeak5=i+1;
@@ -1032,7 +922,7 @@ void stredy22()
         poslednipeak5--;
         predchoziMillis5=aktualniMillis5;
       }
-      ledky[poslednipeak5]=CHSV(0,255,jas); //cervena
+      ledky[poslednipeak5]=CHSV(0+barvaPeak,255,jas); //cervena
 
       for(int i=frekvence[4]+120;i<poslednipeak5;i++)
         ledky[i] = CHSV(0,0,0);
@@ -1045,17 +935,9 @@ FastLED.show();
 
 void vysky21()
 {
-  jas=map(analogRead(A3),50,900,240,0);
-  if(jas<=0)
-    jas=0;
-  if(jas>255)
-    jas=255;
-  padani=map(analogRead(A2),50,900,250,50);
-  barevnyIndex6=map(analogRead(A1),50,900,8,0);
-  barva6=map(analogRead(A4),50,900,255,0);
   for(int i=150;i<=frekvence[5]+150;i++)
     {
-      ledky[i]=CHSV(230+barva6+barevnyIndex6*(i-150),255,jas);
+      ledky[i]=CHSV(230+barva+barevnyIndex*(i-150),255,jas);
 
         if(poslednipeak6<i)
         poslednipeak6=i+1;
@@ -1067,7 +949,7 @@ void vysky21()
         poslednipeak6--;
         predchoziMillis6=aktualniMillis6;
       }
-      ledky[poslednipeak6]=CHSV(120,255,jas); //cervena
+      ledky[poslednipeak6]=CHSV(120+barvaPeak,255,jas); //cervena
 
       for(int i=frekvence[5]+150;i<poslednipeak6;i++)
         ledky[i] = CHSV(0,0,0);
