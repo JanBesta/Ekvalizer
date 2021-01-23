@@ -4,7 +4,7 @@
 #include <math.h>
 
 Analyzer Audio = Analyzer(12,13,0);//Strobe pin ->12  RST pin ->13 Analog Pin ->0
-//Verze 1.3 pro spektrální analyzer
+//Verze 1.3 pro sektrální analyzer
 
 #define PINproLEDky 8
 #define pocetLED 210
@@ -173,7 +173,7 @@ void loop()
   {
     hodnotafrekvence[i]=constrain(hodnotafrekvence[i],0,1023);
     frekvence[i]=map(hodnotafrekvence[i],145,1023,0,30);
-    Serial.print(hodnotafrekvence[i]); //vypis hodnot pro debugovani
+    Serial.print(hodnotafrekvence[i]);//used for debugging and Freq choosing
     Serial.print(" ");
   }
   Serial.println("");
@@ -189,14 +189,14 @@ void loop()
   {
     hodnotafrekvence[i]=constrain(hodnotafrekvence[i],0,1023);
     frekvence1[i]=map(hodnotafrekvence[i],145,1023,14,29);
-    Serial.print(hodnotafrekvence[i]); //opet vypis hodnot pro debugovani
+    Serial.print(hodnotafrekvence[i]);//used for debugging and Freq choosing
     Serial.print(" ");
   }
   for (int i = 0;i<7;i++)
   {
     hodnotafrekvence[i]=constrain(hodnotafrekvence[i],0,1023);
     frekvence2[i]=map(hodnotafrekvence[i],145,1023,14,0);
-    Serial.print(hodnotafrekvence[i]); //pět vypis hodnot pro debugovani
+    Serial.print(hodnotafrekvence[i]);//used for debugging and Freq choosing
     Serial.print(" ");
   }
 
@@ -1218,9 +1218,7 @@ void lcd1()
     lcd.setCursor(0,1);
     lcd.print("-   ");
     lcd.print("Animace");
-    lcd.print(" (");
-    lcd.print(volba);
-    lcd.print(")   ");
+    
   }
   if(volba==1)
   {
@@ -1241,6 +1239,26 @@ void lcd1()
     lcd.print("      ");
   }
   if(volba==3)
+  {
+    lcd.setCursor(0,0);
+    lcd.print("+  VOLBA REZIMU ");
+    lcd.setCursor(0,1);
+    lcd.print("-       ");
+    lcd.print(volba);
+    lcd.print("      ");
+  }
+  if(volba==4)
+  {
+    lcd.setCursor(0,0);
+    lcd.print("+  VOLBA REZIMU ");
+    lcd.setCursor(0,1);
+    lcd.print("-   BASIC");
+    lcd.print(" (");
+    lcd.print(volba);
+    lcd.print(")   ");
+    
+  }
+  if(volba==5)
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
