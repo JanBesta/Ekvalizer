@@ -1216,8 +1216,10 @@ void lcd1()
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
     lcd.setCursor(0,1);
-    lcd.print("-   ");
-    lcd.print("Animace");
+    lcd.print("-  ANIMACE");
+    lcd.print("  (");
+    lcd.print(volba);
+    lcd.print(")   ");
     
   }
   if(volba==1)
