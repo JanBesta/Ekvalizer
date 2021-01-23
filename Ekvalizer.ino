@@ -4,7 +4,7 @@
 #include <math.h>
 
 Analyzer Audio = Analyzer(12,13,0);//Strobe pin ->12  RST pin ->13 Analog Pin ->0
-//Verze 1.3 pro sektrální analyzer
+//Verze 1.3 pro spektrální analyzer
 
 #define PINproLEDky 8
 #define pocetLED 210
@@ -173,7 +173,7 @@ void loop()
   {
     hodnotafrekvence[i]=constrain(hodnotafrekvence[i],0,1023);
     frekvence[i]=map(hodnotafrekvence[i],145,1023,0,30);
-    Serial.print(hodnotafrekvence[i]);//used for debugging and Freq choosing
+    Serial.print(hodnotafrekvence[i]); //vypis hodnot pro debugovani
     Serial.print(" ");
   }
   Serial.println("");
@@ -189,14 +189,14 @@ void loop()
   {
     hodnotafrekvence[i]=constrain(hodnotafrekvence[i],0,1023);
     frekvence1[i]=map(hodnotafrekvence[i],145,1023,14,29);
-    Serial.print(hodnotafrekvence[i]);//used for debugging and Freq choosing
+    Serial.print(hodnotafrekvence[i]); //opet vypis hodnot pro debugovani
     Serial.print(" ");
   }
   for (int i = 0;i<7;i++)
   {
     hodnotafrekvence[i]=constrain(hodnotafrekvence[i],0,1023);
     frekvence2[i]=map(hodnotafrekvence[i],145,1023,14,0);
-    Serial.print(hodnotafrekvence[i]);//used for debugging and Freq choosing
+    Serial.print(hodnotafrekvence[i]); //pět vypis hodnot pro debugovani
     Serial.print(" ");
   }
 
