@@ -1330,7 +1330,9 @@ FastLED.show();
 
 void lcd1()
 {
-  if(volba==0)
+  switch(volba)
+  {
+  case 0:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
@@ -1339,9 +1341,9 @@ void lcd1()
     lcd.print("  (");
     lcd.print(volba);
     lcd.print(")   ");
-    
+    break;
   }
-  if(volba==1)
+  case 1:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
@@ -1349,8 +1351,9 @@ void lcd1()
     lcd.print("-       ");
     lcd.print(volba);
     lcd.print("      ");
+    break;
   }
-  if(volba==2)
+  case 2:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
@@ -1358,8 +1361,9 @@ void lcd1()
     lcd.print("-       ");
     lcd.print(volba);
     lcd.print("      ");
+    break;
   }
-  if(volba==3)
+  case 3:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
@@ -1367,8 +1371,9 @@ void lcd1()
     lcd.print("-       ");
     lcd.print(volba);
     lcd.print("      ");
+    break;
   }
-  if(volba==4)
+  case 4:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
@@ -1377,9 +1382,10 @@ void lcd1()
     lcd.print(" (");
     lcd.print(volba);
     lcd.print(")   ");
+    break;
     
   }
-  if(volba==5)
+  case 5:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
@@ -1387,5 +1393,7 @@ void lcd1()
     lcd.print("-       ");
     lcd.print(volba);
     lcd.print("      ");
+    break;
   }
+ }
 }
