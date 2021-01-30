@@ -4,25 +4,24 @@
 #include <math.h>
 
 Analyzer Audio = Analyzer(12,13,0);//Strobe pin ->12  RST pin ->13 Analog Pin ->0
-//Verze 1.3 pro sektrální analyzer
+//Verze 1.3 pro spektrální analyzer
 
 #define PINproLEDky 8
 #define pocetLED 210
 #define STROBE 4
 #define RESET 5
-
 //Promenne pro ekvalizer
 
 int hodnotafrekvence[7], frekvence[7], frekvence1[7], frekvence2[7];
-int jas;
-int padani;
-int barevnyIndex;
-int barva;
-int barvaPeak;
+int jas=0;
+int padani=0;
+int barevnyIndex=0;
+int barva=0;
+int barvaPeak=0;
 int volba=1;
 
 int poslednipeak1=0, poslednipeak2=0, poslednipeak3=0, poslednipeak4=0, poslednipeak5=0, poslednipeak6=0, poslednipeak7=0;
-unsigned long aktualniMillis1, predchoziMillis1=0, aktualniMillis2, predchoziMillis2=0, aktualniMillis3, predchoziMillis3=0, aktualniMillis4, predchoziMillis4=0, aktualniMillis5, predchoziMillis5=0, aktualniMillis6, predchoziMillis6=0, aktualniMillis7, predchoziMillis7=0;
+unsigned long aktualniMillis, aktualniMillis1, predchoziMillis1=0, aktualniMillis2, predchoziMillis2=0, aktualniMillis3, predchoziMillis3=0, aktualniMillis4, predchoziMillis4=0, aktualniMillis5, predchoziMillis5=0, aktualniMillis6, predchoziMillis6=0, aktualniMillis7, predchoziMillis7=0;
 
 long poslednipeak011=0, poslednipeak012=0, poslednipeak111=0, poslednipeak112=0, poslednipeak211=0, poslednipeak212=0, poslednipeak311=0, poslednipeak312=0, poslednipeak411=0, poslednipeak412=0, poslednipeak511=0, poslednipeak512=0, poslednipeak611=0, poslednipeak612=0;
 unsigned long aktualniMillis011, predchoziMillis011=0, aktualniMillis012, predchoziMillis012=0, aktualniMillis111, predchoziMillis111=0, aktualniMillis112, predchoziMillis112=0, aktualniMillis211, predchoziMillis211=0, aktualniMillis212, predchoziMillis212=0; 
@@ -72,7 +71,8 @@ void stredybasic12();
 void vyskybasic11();
 void vyskybasic12();
 
-void animace();
+void animace1();
+void animace2();
 void lcd1();
 
 void tlacitko1();
@@ -112,43 +112,43 @@ void setup()
   
   for(int i = 0;i<30;i++)
   {
-    ledky[i] = CHSV(0,255,150);
+    ledky[i] = CHSV(0,255,100);
     delay(20);
     FastLED.show();
   }
   for(int i = 30;i<60;i++)
   {
-    ledky[i] = CHSV(74,255,150);
+    ledky[i] = CHSV(74,255,100);
     delay(20);
     FastLED.show();
   }
   for(int i = 60;i<90;i++)
   {
-    ledky[i] = CHSV(111,255,150);
+    ledky[i] = CHSV(111,255,100);
     delay(20);
     FastLED.show();
   }
   for(int i = 90;i<120;i++)
   {
-    ledky[i] = CHSV(37,255,150);
+    ledky[i] = CHSV(37,255,100);
     delay(20);
     FastLED.show();
   }
   for(int i = 120;i<150;i++)
   {
-    ledky[i] = CHSV(222,255,150);
+    ledky[i] = CHSV(222,255,100);
     delay(20);
     FastLED.show();
   }
   for(int i = 150;i<180;i++)
   {
-    ledky[i] = CHSV(185,255,150);
+    ledky[i] = CHSV(185,255,100);
     delay(20);
     FastLED.show();
   }
   for(int i = 180;i<210;i++)
   {
-    ledky[i] = CHSV(148,255,150);
+    ledky[i] = CHSV(148,255,100);
     delay(20);
     FastLED.show();
   }
@@ -214,28 +214,60 @@ void loop()
   }
   Serial.println(" ");
 
+
+  if(map(analogRead(A1),20,1000,255,0)<jas || map(analogRead(A1),20,1000,255,0)>jas)
+  {
+    jas=map(analogRead(A1),20,1000,255,0);
+    if(jas<0)
+      jas=0;
+    if(jas>255)
+      jas=255;
+  }
   
-  jas=map(analogRead(A1),20,1000,255,0);
-  if(jas<0)
-    jas=0;
-  if(jas>255)
-    jas=255;
   delayMicroseconds(1);
+
+  if(map(analogRead(A2),20,1000,255,0)<barva || map(analogRead(A2),20,1000,255,0>barva))
+  {
   barva=map(analogRead(A2),20,1000,255,0);
-  if(barva<0)
-    barva=0;
+    if(barva<0)
+      barva=0;
+    if(barva>255)
+      barva=255;
+  }
+    
   delayMicroseconds(1);
-  barevnyIndex=map(analogRead(A3),20,1000,8,0);
-  if(barevnyIndex<0)
-    barevnyIndex=0;
+  
+  if(map(analogRead(A3),20,1000,8,0)<barevnyIndex || map(analogRead(A3),20,1000,255,0)>barevnyIndex)
+  {
+    barevnyIndex=map(analogRead(A3),20,1000,8,0);
+    if(barevnyIndex<0)
+      barevnyIndex=0;
+    if(barevnyIndex>255)
+      barevnyIndex=255;
+  }
+  
   delayMicroseconds(1);
-  padani=map(analogRead(A4),20,1000,250,0);
-  if(padani<10)
-    padani=10;
+  
+  if(map(analogRead(A4),20,1000,250,0)<padani || map(analogRead(A4),20,1000,250,0)>padani)
+  {
+    padani=map(analogRead(A4),20,1000,250,0);
+    if(padani<0)
+      padani=0;
+    if(padani>250)
+      padani=250;
+  }
+  
   delayMicroseconds(1);
-  barvaPeak=map(analogRead(A5),20,900,255,0);
-  if(barvaPeak<0)
-    barvaPeak=0;
+  
+  if(map(analogRead(A5),20,1000,255,0)<barvaPeak || map(analogRead(A5),20,900,255,0)>barvaPeak)
+  {
+    barvaPeak=map(analogRead(A5),20,900,255,0);
+    if(barvaPeak<0)
+      barvaPeak=0;
+    if(barvaPeak>255)
+      barvaPeak=255;
+  }
+  
   delayMicroseconds(1);
 
   
@@ -251,7 +283,6 @@ void loop()
   Serial.println(volba);
   Serial.print("barvaPeak: ");
   Serial.println(barvaPeak);
-
   
   lcd1();
 
@@ -259,7 +290,7 @@ void loop()
   {
   case 0:
   {
-    animace();
+    animace1();
   break;
   }
   case 1:
@@ -338,7 +369,7 @@ void tlacitko2()
     volba=0;
 }
 
-void animace()
+void animace1()
 {
   startIndex = startIndex + 8;
   int barevnyIndex=startIndex;
@@ -349,6 +380,94 @@ void animace()
   }
   FastLED.show();
 }
+
+void animace2()
+{
+  int ledka1=random(0,29), ledka2=random(30,59), ledka3=random(60,89), ledka4=random(90,119), ledka5=random(120,149), ledka6=random(150,179), ledka7=random(180,210);
+  int startIndex=0,konecIndex,aktualniIndex,pocitadlo=0;
+  for(int i=0;i<30;i++)
+        ledky[i] = CHSV(0,0,0);
+  konecIndex=ledka1;
+  for(startIndex=0;startIndex<konecIndex-3;startIndex++)
+  { 
+    aktualniIndex==0;
+    if(startIndex==0||startIndex==1||startIndex==2)
+      {
+        ledky[startIndex]=CHSV(barva,255,110);
+        aktualniIndex = 0;
+      }else{
+        aktualniIndex++;
+        ledky[startIndex]=CHSV(barva,255,110);
+        ledky[startIndex+1]=CHSV(barva,255,110);
+        ledky[aktualniIndex]=CHSV(0,0,0);
+      }
+    FastLED.show();
+  }
+}
+
+void fade1() 
+{
+  fadeToBlackBy(ledky, pocetLED, 10);
+  for( int i = 0; i < 8; i++) {
+    ledky[beatsin16(20,0,29)]=CHSV(barva+barevnyIndex,255,200);
+  }
+FastLED.show();
+}
+
+void fade2() 
+{
+  fadeToBlackBy(ledky, pocetLED, 10);
+  for(int i = 0; i < 8; i++) {
+    ledky[beatsin16(12,30,59)]=CHSV(barva+barevnyIndex,255,200);
+  }
+FastLED.show();
+}
+
+void fade3() 
+{
+  fadeToBlackBy(ledky, pocetLED, 10);
+  for(int i = 0; i < 8; i++) {
+    ledky[beatsin16(12,60,89)]=CHSV(barva+barevnyIndex,255,200);
+  }
+FastLED.show();
+}
+
+void fade4() 
+{
+  fadeToBlackBy(ledky, pocetLED, 10);
+  for(int i = 0; i < 8; i++) {
+    ledky[beatsin16(12,90,119)]=CHSV(barva+barevnyIndex,255,200);
+  }
+FastLED.show();
+}
+
+void fade5() 
+{
+  fadeToBlackBy(ledky, pocetLED, 10);
+  for(int i = 0; i < 8; i++) {
+    ledky[beatsin16(12,120,149)]=CHSV(barva+barevnyIndex,255,200);
+  }
+FastLED.show();
+}
+
+void fade6() 
+{
+  fadeToBlackBy(ledky, pocetLED, 10);
+  for(int i = 0; i < 8; i++) {
+    ledky[beatsin16(12,150,179)]=CHSV(barva+barevnyIndex,255,200);
+  }
+FastLED.show();
+}
+
+void fade7() 
+{
+  fadeToBlackBy(ledky, pocetLED, 10);
+  for(int i = 0; i < 8; i++) {
+    ledky[beatsin16(12,180,209)]=CHSV(barva+barevnyIndex,255,200);
+  }
+FastLED.show();
+}
+
 
 void basy01()
 {
@@ -573,7 +692,7 @@ for(int i=14, j=14;i<=frekvence1[0] && j>=frekvence2[0];i++,j--)
       for(int i=poslednipeak011+1;i<=30;i++)
         ledky[i] = CHSV(0,0,0);
         
-    ledky[j] = CHSV(barva+(barevnyIndex*j),255,jas);
+    ledky[j] = CHSV(barva+(barevnyIndex*i),255,jas);
 
     if(poslednipeak012>j)
         poslednipeak012=j+1;
@@ -619,7 +738,7 @@ void basy12()
       for(int i=poslednipeak111+1;i<=60;i++)
         ledky[i] = CHSV(0,0,0);
 
-    ledky[j] = CHSV(barva+barevnyIndex*(j-30),255,jas);
+    ledky[j] = CHSV(barva+barevnyIndex*(i-30),255,jas);
 
     if(poslednipeak112>j)
         poslednipeak112=j+1;
@@ -664,7 +783,7 @@ void basy13()
       for(int i=poslednipeak211+1;i<=90;i++)
         ledky[i] = CHSV(0,0,0);
         
-    ledky[j] = CHSV(barva+barevnyIndex*(j-60),255,jas);
+    ledky[j] = CHSV(barva+barevnyIndex*(i-60),255,jas);
 
     if(poslednipeak212>j)
         poslednipeak212=j+1;
@@ -709,7 +828,7 @@ void stredy11()
       for(int i=poslednipeak311+1;i<=120;i++)
         ledky[i] = CHSV(0,0,0);
 
-    ledky[j] = CHSV(barva+barevnyIndex*(j-90),255,jas);
+    ledky[j] = CHSV(barva+barevnyIndex*(i-90),255,jas);
 
     if(poslednipeak312>j)
         poslednipeak312=j+1;
@@ -754,7 +873,7 @@ void stredy12()
       for(int i=poslednipeak411+1;i<=150;i++)
         ledky[i] = CHSV(0,0,0);
     
-    ledky[j] = CHSV(barva+barevnyIndex*(j-120),255,jas);
+    ledky[j] = CHSV(barva+barevnyIndex*(i-120),255,jas);
 
     if(poslednipeak412>j)
         poslednipeak412=j+1;
@@ -799,7 +918,7 @@ void vysky11()
       for(int i=poslednipeak511+1;i<=180;i++)
         ledky[i] = CHSV(0,0,0);
     
-    ledky[j] = CHSV(barva+barevnyIndex*(j-150),255,jas);
+    ledky[j] = CHSV(barva+barevnyIndex*(i-150),255,jas);
 
     if(poslednipeak512>j)
         poslednipeak512=j+1;
@@ -844,7 +963,7 @@ void vysky12()
       for(int i=poslednipeak611+1;i<=209;i++)
         ledky[i] = CHSV(0,0,0);
     
-    ledky[j] = CHSV(barva+barevnyIndex*(j-180),255,jas);
+    ledky[j] = CHSV(barva+barevnyIndex*(i-180),255,jas);
 
     if(poslednipeak612>j)
         poslednipeak612=j+1;
