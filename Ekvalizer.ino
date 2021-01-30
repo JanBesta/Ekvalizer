@@ -173,7 +173,7 @@ void loop()
   {
     hodnotafrekvence[i]=constrain(hodnotafrekvence[i],0,1023);
     frekvence[i]=map(hodnotafrekvence[i],145,1023,0,30);
-    Serial.print(hodnotafrekvence[i]);//used for debugging and Freq choosing
+    Serial.print(hodnotafrekvence[i]);//debuggovani
     Serial.print(" ");
   }
   Serial.println("");
