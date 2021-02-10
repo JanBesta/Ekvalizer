@@ -10,14 +10,15 @@ Analyzer Audio = Analyzer(12,13,0);//Strobe pin ->12  RST pin ->13 Analog Pin ->
 #define pocetLED 210
 #define STROBE 4
 #define RESET 5
-//Promenne pro ekvalizer
 
+//Promenne pro ekvalizer
 int hodnotafrekvence[7], frekvence[7], frekvence1[7], frekvence2[7];
-int jas=0;
-int padani=0;
-int barevnyIndex=0;
-int barva=0;
-int barvaPeak=0;
+unsigned long jas=0;
+unsigned long padani=0;
+unsigned long barevnyIndex=0;
+unsigned long barva=0;
+unsigned long barvaTecky=0, barevnyIndex1=0;
+unsigned long prumernyJas=0, soucetJas=0, pocetJas=0;
 int volba=1;
 
 int poslednipeak1=0, poslednipeak2=0, poslednipeak3=0, poslednipeak4=0, poslednipeak5=0, poslednipeak6=0, poslednipeak7=0;
@@ -30,7 +31,6 @@ unsigned long aktualniMillis311, predchoziMillis311=0, aktualniMillis312, predch
 CRGB ledky[pocetLED];
 
 // hlavicky funkci
-
 void basy01();
 void basy02();
 void basy03();
@@ -189,24 +189,27 @@ void loop()
   {
     hodnotafrekvence[i]=constrain(hodnotafrekvence[i],0,1023);
     frekvence1[i]=map(hodnotafrekvence[i],145,1023,14,29);
-    Serial.print(hodnotafrekvence[i]);//used for debugging and Freq choosing
+    Serial.print(hodnotafrekvence[i]);//debuggovani
     Serial.print(" ");
   }
-  for (int i = 0;i<7;i++)
-  {
-    hodnotafrekvence[i]=constrain(hodnotafrekvence[i],0,1023);
-    frekvence2[i]=map(hodnotafrekvence[i],145,1023,14,0);
-    Serial.print(hodnotafrekvence[i]);//used for debugging and Freq choosing
-    Serial.print(" ");
-  }
+  Serial.println(" ");
 
-  
   for(int i=0;i<=6;i++)
   {
     Serial.print(frekvence1[i]);
     Serial.print(" ");
   }
   Serial.println(" ");
+  
+  for (int i = 0;i<7;i++)
+  {
+    hodnotafrekvence[i]=constrain(hodnotafrekvence[i],0,1023);
+    frekvence2[i]=map(hodnotafrekvence[i],145,1023,14,0);
+    Serial.print(hodnotafrekvence[i]);//debugovani
+    Serial.print(" ");
+  }
+  Serial.println(" ");
+  
   for(int i=0;i<=6;i++)
   {
     Serial.print(frekvence2[i]);
@@ -237,13 +240,24 @@ void loop()
     
   delayMicroseconds(1);
   
-  if(map(analogRead(A3),20,1000,8,0)<barevnyIndex || map(analogRead(A3),20,1000,255,0)>barevnyIndex)
+  if(map(analogRead(A3),20,1000,10,0)<barevnyIndex || map(analogRead(A3),20,1000,10,0)>barevnyIndex)
   {
-    barevnyIndex=map(analogRead(A3),20,1000,8,0);
+    barevnyIndex=map(analogRead(A3),20,1000,10,0);
     if(barevnyIndex<0)
       barevnyIndex=0;
     if(barevnyIndex>255)
       barevnyIndex=255;
+  }
+
+  delayMicroseconds(1);
+  
+  if(map(analogRead(A3),20,1000,16,0)<barevnyIndex1 || map(analogRead(A3),20,1000,16,0)>barevnyIndex1)
+  {
+    barevnyIndex1=map(analogRead(A3),20,1000,16,0);
+    if(barevnyIndex1<0)
+      barevnyIndex1=0;
+    if(barevnyIndex1>255)
+      barevnyIndex1=255;
   }
   
   delayMicroseconds(1);
@@ -259,13 +273,13 @@ void loop()
   
   delayMicroseconds(1);
   
-  if(map(analogRead(A5),20,1000,255,0)<barvaPeak || map(analogRead(A5),20,900,255,0)>barvaPeak)
+  if(map(analogRead(A5),20,1000,255,0)<barvaTecky || map(analogRead(A5),20,900,255,0)>barvaTecky)
   {
-    barvaPeak=map(analogRead(A5),20,900,255,0);
-    if(barvaPeak<0)
-      barvaPeak=0;
-    if(barvaPeak>255)
-      barvaPeak=255;
+    barvaTecky=map(analogRead(A5),20,1000,255,0);
+    if(barvaTecky<0)
+      barvaTecky=0;
+    if(barvaTecky>255)
+      barvaTecky=255;
   }
   
   delayMicroseconds(1);
@@ -281,11 +295,11 @@ void loop()
   Serial.println(barva);
   Serial.print("volba: ");
   Serial.println(volba);
-  Serial.print("barvaPeak: ");
-  Serial.println(barvaPeak);
+  Serial.print("barvaTecky: ");
+  Serial.println(barvaTecky);
   
   lcd1();
-
+  
   switch(volba)
   {
   case 0:
@@ -489,7 +503,7 @@ void basy01()
         predchoziMillis1=aktualniMillis1;
       }
       
-      ledky[poslednipeak1]=CHSV(barvaPeak,255,jas); //nastaveni barvy tecky a stjeneho jasu jak jsou ostatni ledky
+      ledky[poslednipeak1]=CHSV(barvaTecky,255,jas); //nastaveni barvy tecky a stjeneho jasu jak jsou ostatni ledky
 
       
       //1. for - zhasina ledky mezi peakem a LEDkami, ktere jezdi podle hodnoty; 2. for - zhasina od peaku do konce pasku (+1 protoze by mi jinak zhasl i ten peak)
@@ -520,7 +534,7 @@ void basy02()
         poslednipeak2--;
         predchoziMillis2=aktualniMillis2;
       }
-      ledky[poslednipeak2]=CHSV(barvaPeak,255,jas); 
+      ledky[poslednipeak2]=CHSV(barvaTecky,255,jas); 
 
       for(int i=frekvence[1]+30;i<poslednipeak2;i++)
         ledky[i] = CHSV(0,0,0);
@@ -548,7 +562,7 @@ void basy03()
         predchoziMillis3=aktualniMillis3;
       }
       
-      ledky[poslednipeak3]=CHSV(barvaPeak,255,jas); 
+      ledky[poslednipeak3]=CHSV(barvaTecky,255,jas); 
 
       for(int i=frekvence[2]+60;i<poslednipeak3;i++)
         ledky[i] = CHSV(0,0,0);
@@ -576,7 +590,7 @@ void stredy01()
         predchoziMillis4=aktualniMillis4;
       }
       
-      ledky[poslednipeak4]=CHSV(barvaPeak,255,jas); 
+      ledky[poslednipeak4]=CHSV(barvaTecky,255,jas); 
 
       for(int i=frekvence[3]+90;i<poslednipeak4;i++)
         ledky[i] = CHSV(0,0,0);
@@ -604,7 +618,7 @@ void stredy02()
         predchoziMillis5=aktualniMillis5;
       }
       
-      ledky[poslednipeak5]=CHSV(barvaPeak,255,jas);
+      ledky[poslednipeak5]=CHSV(barvaTecky,255,jas);
 
       for(int i=frekvence[4]+120;i<poslednipeak5;i++)
         ledky[i] = CHSV(0,0,0);
@@ -631,7 +645,7 @@ void vysky01()
         predchoziMillis6=aktualniMillis6;
       }
       
-      ledky[poslednipeak6]=CHSV(barvaPeak,255,jas);
+      ledky[poslednipeak6]=CHSV(barvaTecky,255,jas);
 
       for(int i=frekvence[5]+150;i<poslednipeak6;i++)
         ledky[i] = CHSV(0,0,0);
@@ -658,7 +672,7 @@ void vysky02()
         predchoziMillis7=aktualniMillis7;
       }
       
-      ledky[poslednipeak7]=CHSV(barvaPeak,255,jas);
+      ledky[poslednipeak7]=CHSV(barvaTecky,255,jas);
 
       for(int i=frekvence[6]+180;i<poslednipeak7;i++)
         ledky[i] = CHSV(0,0,0);
@@ -673,7 +687,7 @@ void basy11()
 {
 for(int i=14, j=14;i<=frekvence1[0] && j>=frekvence2[0];i++,j--)
   {
-    ledky[i] = CHSV(barva+(barevnyIndex*i),255,jas);
+    ledky[i] = CHSV(barva+(barevnyIndex1*i),255,jas);
 
     if(poslednipeak011<i)
         poslednipeak011=i+1;
@@ -685,14 +699,14 @@ for(int i=14, j=14;i<=frekvence1[0] && j>=frekvence2[0];i++,j--)
         poslednipeak011--;
         predchoziMillis011=aktualniMillis011;
       }
-      ledky[poslednipeak011]=CHSV(barvaPeak,255,jas); 
+      ledky[poslednipeak011]=CHSV(barvaTecky,255,jas); 
 
       for(int i=frekvence1[0];i<poslednipeak011;i++)
         ledky[i] = CHSV(0,0,0);
       for(int i=poslednipeak011+1;i<=30;i++)
         ledky[i] = CHSV(0,0,0);
         
-    ledky[j] = CHSV(barva+(barevnyIndex*i),255,jas);
+    ledky[j] = CHSV(barva+(barevnyIndex1*i),255,jas);
 
     if(poslednipeak012>j)
         poslednipeak012=j+1;
@@ -704,7 +718,7 @@ for(int i=14, j=14;i<=frekvence1[0] && j>=frekvence2[0];i++,j--)
         poslednipeak012++;
         predchoziMillis012=aktualniMillis012;
       }
-      ledky[poslednipeak012]=CHSV(barvaPeak,255,jas);
+      ledky[poslednipeak012]=CHSV(barvaTecky,255,jas);
 
       for(int j=frekvence2[0];j>poslednipeak012;j--)
         ledky[j] = CHSV(0,0,0);
@@ -719,7 +733,7 @@ void basy12()
 {
   for(int i=44, j=44;i<=frekvence1[1]+30 && j>=frekvence2[1]+30;i++, j--)
   {
-    ledky[i] = CHSV(barva+barevnyIndex*(i-30),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex1*(i-30),255,jas);
 
     if(poslednipeak111<i)
         poslednipeak111=i+1;
@@ -731,14 +745,14 @@ void basy12()
         poslednipeak111--;
         predchoziMillis111=aktualniMillis111;
       }
-      ledky[poslednipeak111]=CHSV(barvaPeak,255,jas); 
+      ledky[poslednipeak111]=CHSV(barvaTecky,255,jas); 
 
       for(int i=frekvence1[1]+30;i<poslednipeak111;i++)
         ledky[i] = CHSV(0,0,0);
       for(int i=poslednipeak111+1;i<=60;i++)
         ledky[i] = CHSV(0,0,0);
 
-    ledky[j] = CHSV(barva+barevnyIndex*(i-30),255,jas);
+    ledky[j] = CHSV(barva+barevnyIndex1*(i-30),255,jas);
 
     if(poslednipeak112>j)
         poslednipeak112=j+1;
@@ -750,7 +764,7 @@ void basy12()
         poslednipeak112++;
         predchoziMillis112=aktualniMillis112;
       }
-      ledky[poslednipeak112]=CHSV(barvaPeak,255,jas);
+      ledky[poslednipeak112]=CHSV(barvaTecky,255,jas);
 
       for(int j=frekvence2[1]+30;j>poslednipeak112;j--)
         ledky[j] = CHSV(0,0,0);
@@ -764,7 +778,7 @@ void basy13()
 {
   for(int i=74, j=74;i<=frekvence1[2]+60 && j>=frekvence2[2]+60;i++, j--)
   {
-    ledky[i] = CHSV(barva+barevnyIndex*(i-60),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex1*(i-60),255,jas);
 
     if(poslednipeak211<i)
         poslednipeak211=i+1;
@@ -776,14 +790,14 @@ void basy13()
         poslednipeak211--;
         predchoziMillis211=aktualniMillis211;
       }
-      ledky[poslednipeak211]=CHSV(barvaPeak,255,jas); 
+      ledky[poslednipeak211]=CHSV(barvaTecky,255,jas); 
 
       for(int i=frekvence1[2]+60;i<poslednipeak211;i++)
         ledky[i] = CHSV(0,0,0);
       for(int i=poslednipeak211+1;i<=90;i++)
         ledky[i] = CHSV(0,0,0);
         
-    ledky[j] = CHSV(barva+barevnyIndex*(i-60),255,jas);
+    ledky[j] = CHSV(barva+barevnyIndex1*(i-60),255,jas);
 
     if(poslednipeak212>j)
         poslednipeak212=j+1;
@@ -795,7 +809,7 @@ void basy13()
         poslednipeak212++;
         predchoziMillis212=aktualniMillis212;
       }
-      ledky[poslednipeak212]=CHSV(barvaPeak,255,jas);
+      ledky[poslednipeak212]=CHSV(barvaTecky,255,jas);
 
       for(int j=frekvence2[2]+60;j>poslednipeak212;j--)
         ledky[j] = CHSV(0,0,0);
@@ -809,7 +823,7 @@ void stredy11()
 {
   for(int i=104, j=104;i<=frekvence1[3]+90 && j>=frekvence2[3];i++, j--)
   {
-    ledky[i] = CHSV(barva+barevnyIndex*(i-90),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex1*(i-90),255,jas);
 
     if(poslednipeak311<i)
         poslednipeak311=i+1;
@@ -821,14 +835,14 @@ void stredy11()
         poslednipeak311--;
         predchoziMillis311=aktualniMillis311;
       }
-      ledky[poslednipeak311]=CHSV(barvaPeak,255,jas); 
+      ledky[poslednipeak311]=CHSV(barvaTecky,255,jas); 
 
       for(int i=frekvence1[3]+90;i<poslednipeak311;i++)
         ledky[i] = CHSV(0,0,0);
       for(int i=poslednipeak311+1;i<=120;i++)
         ledky[i] = CHSV(0,0,0);
 
-    ledky[j] = CHSV(barva+barevnyIndex*(i-90),255,jas);
+    ledky[j] = CHSV(barva+barevnyIndex1*(i-90),255,jas);
 
     if(poslednipeak312>j)
         poslednipeak312=j+1;
@@ -840,7 +854,7 @@ void stredy11()
         poslednipeak312++;
         predchoziMillis312=aktualniMillis312;
       }
-      ledky[poslednipeak312]=CHSV(barvaPeak,255,jas);
+      ledky[poslednipeak312]=CHSV(barvaTecky,255,jas);
 
       for(int j=frekvence2[3]+90;j>poslednipeak312;j--)
         ledky[j] = CHSV(0,0,0);
@@ -854,7 +868,7 @@ void stredy12()
 {
   for(int i=134, j=134;i<=frekvence1[4]+120 && j>=frekvence2[4]+120;i++, j--)
   {
-    ledky[i] = CHSV(barva+barevnyIndex*(i-120),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex1*(i-120),255,jas);
 
     if(poslednipeak411<i)
         poslednipeak411=i+1;
@@ -866,14 +880,14 @@ void stredy12()
         poslednipeak411--;
         predchoziMillis411=aktualniMillis411;
       }
-      ledky[poslednipeak411]=CHSV(barvaPeak,255,jas); 
+      ledky[poslednipeak411]=CHSV(barvaTecky,255,jas); 
 
       for(int i=frekvence1[4]+120;i<poslednipeak411;i++)
         ledky[i] = CHSV(0,0,0);
       for(int i=poslednipeak411+1;i<=150;i++)
         ledky[i] = CHSV(0,0,0);
     
-    ledky[j] = CHSV(barva+barevnyIndex*(i-120),255,jas);
+    ledky[j] = CHSV(barva+barevnyIndex1*(i-120),255,jas);
 
     if(poslednipeak412>j)
         poslednipeak412=j+1;
@@ -885,7 +899,7 @@ void stredy12()
         poslednipeak412++;
         predchoziMillis412=aktualniMillis412;
       }
-      ledky[poslednipeak412]=CHSV(barvaPeak,255,jas);
+      ledky[poslednipeak412]=CHSV(barvaTecky,255,jas);
 
       for(int j=frekvence2[4]+120;j>poslednipeak412;j--)
         ledky[j] = CHSV(0,0,0);
@@ -899,7 +913,7 @@ void vysky11()
 {
   for(int i=164, j=164;i<=frekvence1[5]+150 && j>=frekvence2[5]+150;i++, j--)
   {
-    ledky[i] = CHSV(barva+barevnyIndex*(i-150),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex1*(i-150),255,jas);
 
     if(poslednipeak511<i)
         poslednipeak511=i+1;
@@ -911,14 +925,14 @@ void vysky11()
         poslednipeak511--;
         predchoziMillis511=aktualniMillis511;
       }
-      ledky[poslednipeak511]=CHSV(barvaPeak,255,jas); 
+      ledky[poslednipeak511]=CHSV(barvaTecky,255,jas); 
 
       for(int i=frekvence1[5]+150;i<poslednipeak511;i++)
         ledky[i] = CHSV(0,0,0);
       for(int i=poslednipeak511+1;i<=180;i++)
         ledky[i] = CHSV(0,0,0);
     
-    ledky[j] = CHSV(barva+barevnyIndex*(i-150),255,jas);
+    ledky[j] = CHSV(barva+barevnyIndex1*(i-150),255,jas);
 
     if(poslednipeak512>j)
         poslednipeak512=j+1;
@@ -930,7 +944,7 @@ void vysky11()
         poslednipeak512++;
         predchoziMillis512=aktualniMillis512;
       }
-      ledky[poslednipeak512]=CHSV(barvaPeak,255,jas);
+      ledky[poslednipeak512]=CHSV(barvaTecky,255,jas);
 
       for(int j=frekvence2[5]+150;j>poslednipeak512;j--)
         ledky[j] = CHSV(0,0,0);
@@ -944,7 +958,7 @@ void vysky12()
 {
   for(int i=194, j=194;i<=frekvence1[6]+180 && j>=frekvence2[6]+180;i++, j--)
   {
-    ledky[i] = CHSV(barva+barevnyIndex*(i-180),255,jas);
+    ledky[i] = CHSV(barva+barevnyIndex1*(i-180),255,jas);
 
     if(poslednipeak611<i)
         poslednipeak611=i+1;
@@ -956,14 +970,14 @@ void vysky12()
         poslednipeak611--;
         predchoziMillis611=aktualniMillis611;
       }
-      ledky[poslednipeak611]=CHSV(barvaPeak,255,jas); 
+      ledky[poslednipeak611]=CHSV(barvaTecky,255,jas); 
 
       for(int i=frekvence1[6]+180;i<poslednipeak611;i++)
         ledky[i] = CHSV(0,0,0);
       for(int i=poslednipeak611+1;i<=209;i++)
         ledky[i] = CHSV(0,0,0);
     
-    ledky[j] = CHSV(barva+barevnyIndex*(i-180),255,jas);
+    ledky[j] = CHSV(barva+barevnyIndex1*(i-180),255,jas);
 
     if(poslednipeak612>j)
         poslednipeak612=j+1;
@@ -975,7 +989,7 @@ void vysky12()
         poslednipeak612++;
         predchoziMillis612=aktualniMillis612;
       }
-      ledky[poslednipeak612]=CHSV(barvaPeak,255,jas);
+      ledky[poslednipeak612]=CHSV(barvaTecky,255,jas);
 
       for(int j=frekvence2[6]+180;j>poslednipeak612;j--)
         ledky[j] = CHSV(0,0,0);
@@ -1002,7 +1016,7 @@ void basy21()
         poslednipeak1--;
         predchoziMillis1=aktualniMillis1;
       }
-      ledky[poslednipeak1]=CHSV(50+barvaPeak,255,jas);
+      ledky[poslednipeak1]=CHSV(50+barvaTecky,255,jas);
 
       for(int i=frekvence[0];i<poslednipeak1;i++)
         ledky[i] = CHSV(0,0,0);
@@ -1029,7 +1043,7 @@ void basy22()
         poslednipeak2--;
         predchoziMillis2=aktualniMillis2;
       }
-      ledky[poslednipeak2]=CHSV(100+barvaPeak,255,jas);
+      ledky[poslednipeak2]=CHSV(100+barvaTecky,255,jas);
 
       for(int i=frekvence[1]+30;i<poslednipeak2;i++)
         ledky[i] = CHSV(0,0,0);
@@ -1056,7 +1070,7 @@ void basy23()
         poslednipeak3--;
         predchoziMillis3=aktualniMillis3;
       }
-      ledky[poslednipeak3]=CHSV(200+barvaPeak,255,jas);
+      ledky[poslednipeak3]=CHSV(200+barvaTecky,255,jas);
 
       for(int i=frekvence[2]+60;i<poslednipeak3;i++)
         ledky[i] = CHSV(0,0,0);
@@ -1083,7 +1097,7 @@ void stredy21()
         poslednipeak4--;
         predchoziMillis4=aktualniMillis4;
       }
-      ledky[poslednipeak4]=CHSV(30+barvaPeak,255,jas);
+      ledky[poslednipeak4]=CHSV(30+barvaTecky,255,jas);
 
       for(int i=frekvence[3]+90;i<poslednipeak4;i++)
         ledky[i] = CHSV(0,0,0);
@@ -1110,7 +1124,7 @@ void stredy22()
         poslednipeak5--;
         predchoziMillis5=aktualniMillis5;
       }
-      ledky[poslednipeak5]=CHSV(0+barvaPeak,255,jas);
+      ledky[poslednipeak5]=CHSV(0+barvaTecky,255,jas);
 
       for(int i=frekvence[4]+120;i<poslednipeak5;i++)
         ledky[i] = CHSV(0,0,0);
@@ -1137,7 +1151,7 @@ void vysky21()
         poslednipeak6--;
         predchoziMillis6=aktualniMillis6;
       }
-      ledky[poslednipeak6]=CHSV(120+barvaPeak,255,jas);
+      ledky[poslednipeak6]=CHSV(120+barvaTecky,255,jas);
 
       for(int i=frekvence[5]+150;i<poslednipeak6;i++)
         ledky[i] = CHSV(0,0,0);
@@ -1163,7 +1177,7 @@ void vysky22()
         poslednipeak7--;
         predchoziMillis7=aktualniMillis7;
       }
-      ledky[poslednipeak7]=CHSV(80+barvaPeak,255,jas); 
+      ledky[poslednipeak7]=CHSV(80+barvaTecky,255,jas); 
 
       for(int i=frekvence[6]+180;i<poslednipeak7;i++)
         ledky[i] = CHSV(0,0,0);
