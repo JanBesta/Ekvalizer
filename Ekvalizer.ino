@@ -387,7 +387,7 @@ void animace1()
 {
   startIndex = startIndex + 8;
   int barevnyIndex=startIndex;
-  for( int i = 0; i<pocetLED; i++) 
+  for(int i = 0; i<pocetLED; i++) 
   {
   ledky[i] = ColorFromPalette(RainbowColors_p, barevnyIndex, jas);
   barevnyIndex+=5;
@@ -395,35 +395,12 @@ void animace1()
   FastLED.show();
 }
 
-void animace2()
-{
-  int ledka1=random(0,29), ledka2=random(30,59), ledka3=random(60,89), ledka4=random(90,119), ledka5=random(120,149), ledka6=random(150,179), ledka7=random(180,210);
-  int startIndex=0,konecIndex,aktualniIndex,pocitadlo=0;
-  for(int i=0;i<30;i++)
-        ledky[i] = CHSV(0,0,0);
-  konecIndex=ledka1;
-  for(startIndex=0;startIndex<konecIndex-3;startIndex++)
-  { 
-    aktualniIndex==0;
-    if(startIndex==0||startIndex==1||startIndex==2)
-      {
-        ledky[startIndex]=CHSV(barva,255,110);
-        aktualniIndex = 0;
-      }else{
-        aktualniIndex++;
-        ledky[startIndex]=CHSV(barva,255,110);
-        ledky[startIndex+1]=CHSV(barva,255,110);
-        ledky[aktualniIndex]=CHSV(0,0,0);
-      }
-    FastLED.show();
-  }
-}
 
 void fade1() 
 {
   fadeToBlackBy(ledky, pocetLED, 10);
   for( int i = 0; i < 8; i++) {
-    ledky[beatsin16(20,0,29)]=CHSV(barva+barevnyIndex,255,200);
+    ledky[beatsin16(12,0,29)]=CHSV(barva+barevnyIndex,255,200);
   }
 FastLED.show();
 }
@@ -459,7 +436,7 @@ void fade5()
 {
   fadeToBlackBy(ledky, pocetLED, 10);
   for(int i = 0; i < 8; i++) {
-    ledky[beatsin16(12,120,149)]=CHSV(barva+barevnyIndex,255,200);
+    ledky[beatsin16(12,120,149)]=CHSV(barva+barevnyIndex, 255, 200);
   }
 FastLED.show();
 }
@@ -468,7 +445,7 @@ void fade6()
 {
   fadeToBlackBy(ledky, pocetLED, 10);
   for(int i = 0; i < 8; i++) {
-    ledky[beatsin16(12,150,179)]=CHSV(barva+barevnyIndex,255,200);
+    ledky[beatsin16(12,150,179)]=CHSV(barva+barevnyIndex, 255, 200);
   }
 FastLED.show();
 }
@@ -477,7 +454,7 @@ void fade7()
 {
   fadeToBlackBy(ledky, pocetLED, 10);
   for(int i = 0; i < 8; i++) {
-    ledky[beatsin16(12,180,209)]=CHSV(barva+barevnyIndex,255,200);
+    ledky[beatsin16(12,180,209)]=CHSV(barva+barevnyIndex, 255, 200);
   }
 FastLED.show();
 }
