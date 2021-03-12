@@ -18,7 +18,7 @@ unsigned long padani;
 unsigned long barevnyIndex;
 unsigned long barva;
 unsigned long barvaTecky, barevnyIndex1;
-int volba=1;
+int volba=2;
 
 int poslednipeak1=0, poslednipeak2=0, poslednipeak3=0, poslednipeak4=0, poslednipeak5=0, poslednipeak6=0, poslednipeak7=0;
 unsigned long aktualniMillis, aktualniMillis1, predchoziMillis1=0, aktualniMillis2, predchoziMillis2=0, aktualniMillis3, predchoziMillis3=0, aktualniMillis4, predchoziMillis4=0, aktualniMillis5, predchoziMillis5=0, aktualniMillis6, predchoziMillis6=0, aktualniMillis7, predchoziMillis7=0;
@@ -338,13 +338,12 @@ for (int i = 0;i<7;i++)
   
   switch(volba)
   {
-  case 0:
+  case 1:
   {
-
-    animace1();
+    animace();
   break;
   }
-  case 1:
+  case 2:
   {
     basy01();
     basy02();
@@ -355,7 +354,7 @@ for (int i = 0;i<7;i++)
     vysky02();
    break;
    }
-   case 2:
+   case 3:
    {
      basy11();
      basy12();
@@ -366,7 +365,7 @@ for (int i = 0;i<7;i++)
      vysky12();
    break;
    }
-   case 3:
+   case 4:
    {
     basy21();
     basy22();
@@ -376,7 +375,7 @@ for (int i = 0;i<7;i++)
     vysky21();
     vysky22();
    break;
-   case 4:
+   case 5:
    {
     basybasic1();
     basybasic2();
@@ -387,7 +386,7 @@ for (int i = 0;i<7;i++)
     vyskybasic2();
    break;
    }
-   case 5:
+   case 6:
    {
     basybasic11();
     basybasic12();
@@ -398,7 +397,7 @@ for (int i = 0;i<7;i++)
     vyskybasic12();
    break;
    }
-   case 6:
+   case 7:
    {
     ledky[0]=CHSV(0,0,0);
     ledky[30]=CHSV(0,0,0);
@@ -416,11 +415,6 @@ for (int i = 0;i<7;i++)
     zBoku7();
    break;
    }
-   
-   default:
-      lcd.clear();
-      lcd.print("Spatne cislo");
-   break;
   }
  }
 }
@@ -428,18 +422,18 @@ for (int i = 0;i<7;i++)
 void tlacitko1()
 {
   volba++;
-  if(volba>6)
-    volba=6;
+  if(volba>7)
+    volba=7;
 }
 
 void tlacitko2()
 {
   volba--;
-  if(volba<0)
-    volba=0;
+  if(volba<1)
+    volba=1;
 }
 
-void animace1()
+void animace()
 {
   startIndex = startIndex + 8;
   int barevnyIndex=startIndex;
@@ -1417,7 +1411,7 @@ void basy01()
       //1. for - zhasina ledky mezi peakem a LEDkami, ktere jezdi podle hodnoty; 2. for - zhasina od peaku do konce pasku (+1 protoze by mi jinak zhasl i ten peak)
       for(int i=frekvence[0];i<poslednipeak1;i++)
         ledky[i] = CHSV(0,0,0);
-      for(int i=poslednipeak1+1;i<=30;i++)
+      for(int i=poslednipeak1+1;i<=29;i++)
         ledky[i] = CHSV(0,0,0);
     }
 
@@ -1445,7 +1439,7 @@ void basy02()
 
       for(int i=frekvence[1]+30;i<poslednipeak2;i++)
         ledky[i] = CHSV(0,0,0);
-      for(int i=poslednipeak2+1;i<=60;i++)
+      for(int i=poslednipeak2+1;i<=59;i++)
         ledky[i] = CHSV(0,0,0);
     }
 FastLED.show();
@@ -1473,7 +1467,7 @@ void basy03()
 
       for(int i=frekvence[2]+60;i<poslednipeak3;i++)
         ledky[i] = CHSV(0,0,0);
-      for(int i=poslednipeak3+1;i<=90;i++)
+      for(int i=poslednipeak3+1;i<=89;i++)
         ledky[i] = CHSV(0,0,0);
     }
 FastLED.show();
@@ -1501,7 +1495,7 @@ void stredy01()
 
       for(int i=frekvence[3]+90;i<poslednipeak4;i++)
         ledky[i] = CHSV(0,0,0);
-      for(int i=poslednipeak4+1;i<=120;i++)
+      for(int i=poslednipeak4+1;i<=119;i++)
         ledky[i] = CHSV(0,0,0);
     }
 FastLED.show();
@@ -1529,7 +1523,7 @@ void stredy02()
 
       for(int i=frekvence[4]+120;i<poslednipeak5;i++)
         ledky[i] = CHSV(0,0,0);
-      for(int i=poslednipeak5+1;i<=150;i++)
+      for(int i=poslednipeak5+1;i<=149;i++)
         ledky[i] = CHSV(0,0,0);
     }
 FastLED.show();
@@ -1556,7 +1550,7 @@ void vysky01()
 
       for(int i=frekvence[5]+150;i<poslednipeak6;i++)
         ledky[i] = CHSV(0,0,0);
-      for(int i=poslednipeak6+1;i<=180;i++)
+      for(int i=poslednipeak6+1;i<=179;i++)
         ledky[i] = CHSV(0,0,0);
     }
 FastLED.show();
@@ -2253,24 +2247,13 @@ void lcd1()
 {
   switch(volba)
   {
-  case 0:
-  {
-    lcd.setCursor(0,0);
-    lcd.print("+  VOLBA REZIMU ");
-    lcd.setCursor(0,1);
-    lcd.print("-  ANIMACE");
-    lcd.print("  (0");
-    lcd.print(")");
-    break;
-  }
   case 1:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
     lcd.setCursor(0,1);
-    lcd.print("-       ");
-    lcd.print(volba);
-    lcd.print("      ");
+    lcd.print("-  ANIMACE");
+    lcd.print("  (0)  ");
     break;
   }
   case 2:
@@ -2278,9 +2261,8 @@ void lcd1()
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
     lcd.setCursor(0,1);
-    lcd.print("-  ");
-    lcd.print(volba);
-    lcd.print("      ");
+    lcd.print("-  ZAKLADNI");
+    lcd.print("  (1)  ");
     break;
   }
   case 3:
@@ -2288,9 +2270,8 @@ void lcd1()
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
     lcd.setCursor(0,1);
-    lcd.print("-       ");
-    lcd.print(volba);
-    lcd.print("      ");
+    lcd.print("-       2");
+    lcd.print("        ");
     break;
   }
   case 4:
@@ -2298,31 +2279,46 @@ void lcd1()
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
     lcd.setCursor(0,1);
-    lcd.print("-   BASIC");
-    lcd.print(" (");
-    lcd.print(volba);
-    lcd.print(")   ");
+    lcd.print("-       3");
+    lcd.print("         ");
     break;
-    
   }
   case 5:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
     lcd.setCursor(0,1);
-    lcd.print("-       ");
-    lcd.print(volba);
-    lcd.print("      ");
+    lcd.print("- JEDNODUCHY");
+    lcd.print(" (4) ");
+    lcd.print("       ");
     break;
+    
   }
   case 6:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
     lcd.setCursor(0,1);
-    lcd.print("-       ");
-    lcd.print(volba);
-    lcd.print("      ");
+    lcd.print("-       5");
+    lcd.print("         ");
+    break;
+  }
+  case 7:
+  {
+    lcd.setCursor(0,0);
+    lcd.print("+  VOLBA REZIMU ");
+    lcd.setCursor(0,1);
+    lcd.print("-       6");
+    lcd.print("         ");
+    break;
+  }
+  case 8:
+  {
+    lcd.setCursor(0,0);
+    lcd.print("+  VOLBA REZIMU ");
+    lcd.setCursor(0,1);
+    lcd.print("-  Z BOKU");
+    lcd.print(" (7)     ");
     break;
   }
  }
