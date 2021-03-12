@@ -2308,17 +2308,8 @@ void lcd1()
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
     lcd.setCursor(0,1);
-    lcd.print("-       6");
-    lcd.print("         ");
-    break;
-  }
-  case 8:
-  {
-    lcd.setCursor(0,0);
-    lcd.print("+  VOLBA REZIMU ");
-    lcd.setCursor(0,1);
-    lcd.print("-  Z BOKU");
-    lcd.print(" (7)     ");
+    lcd.print("-   Z BOKU");
+    lcd.print(" (6)     ");
     break;
   }
  }
