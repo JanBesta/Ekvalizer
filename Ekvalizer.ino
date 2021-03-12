@@ -1,7 +1,7 @@
 #include <FastLED.h>
 #include <LiquidCrystal_I2C.h>
 #include <AudioAnalyzer.h>
-#include <math.h>
+#include <Wire.h>
 
 Analyzer Audio = Analyzer(12,13,0);//Strobe pin ->12  RST pin ->13 Analog Pin ->0
 //Verze 1.3 pro spektrální analyzer
@@ -13,11 +13,11 @@ Analyzer Audio = Analyzer(12,13,0);//Strobe pin ->12  RST pin ->13 Analog Pin ->
 
 //Promenne pro ekvalizer
 int hodnotafrekvence[7], frekvence[7], frekvence1[7], frekvence2[7], frekvenceZBoku[7], frekvenceBarva[7];
-unsigned long jas=0;
-unsigned long padani=0;
-unsigned long barevnyIndex=0;
-unsigned long barva=0;
-unsigned long barvaTecky=0, barevnyIndex1=0;
+unsigned long jas;
+unsigned long padani;
+unsigned long barevnyIndex;
+unsigned long barva;
+unsigned long barvaTecky, barevnyIndex1;
 int volba=1;
 
 int poslednipeak1=0, poslednipeak2=0, poslednipeak3=0, poslednipeak4=0, poslednipeak5=0, poslednipeak6=0, poslednipeak7=0;
@@ -87,7 +87,7 @@ void tlacitko2();
 
 
 //LCD displej s I2C prevodnikem
-LiquidCrystal_I2C lcd(0x27,20,4);
+LiquidCrystal_I2C lcd(0x27,16,2);
 
 //animacni mod
 uint8_t startIndex = 0;
@@ -95,6 +95,7 @@ uint8_t startIndex = 0;
 void setup()
 {
   Serial.begin(57600);
+  Wire.setClock(100000);
   FastLED.addLeds<WS2812B,PINproLEDky, GRB>(ledky,pocetLED);
   Audio.Init();
   pinMode(STROBE,OUTPUT);
@@ -257,20 +258,16 @@ for (int i = 0;i<7;i++)
   Serial.println(" ");
 
 
-  if(map(analogRead(A1),20,1000,255,0)<jas || map(analogRead(A1),20,1000,255,0)>jas)
+  if(map(analogRead(A1),10,1000,255,00)<jas || map(analogRead(A1),10,1000,255,0)>jas)
   {
-    jas=map(analogRead(A1),20,1000,255,0);
-    if(jas<0)
-      jas=0;
-    if(jas>255)
-      jas=255;
+    jas=map(analogRead(A1),10,1000,255,0);
   }
   
   delayMicroseconds(1);
 
-  if(map(analogRead(A2),20,1000,255,0)<barva || map(analogRead(A2),20,1000,255,0>barva))
+  if(map(analogRead(A2),0,1000,255,0)<barva || map(analogRead(A2),0,1000,255,0>barva))
   {
-  barva=map(analogRead(A2),20,1000,255,0);
+  barva=map(analogRead(A2),50,1000,255,0);
     if(barva<0)
       barva=0;
     if(barva>255)
@@ -279,7 +276,7 @@ for (int i = 0;i<7;i++)
     
   delayMicroseconds(1);
   
-  if(map(analogRead(A3),20,1000,10,0)<barevnyIndex || map(analogRead(A3),20,1000,10,0)>barevnyIndex)
+  if(map(analogRead(A3),0,1000,10,0)<barevnyIndex || map(analogRead(A3),0,1000,10,0)>barevnyIndex)
   {
     barevnyIndex=map(analogRead(A3),20,1000,10,0);
     if(barevnyIndex<0)
@@ -290,7 +287,7 @@ for (int i = 0;i<7;i++)
 
   delayMicroseconds(1);
   
-  if(map(analogRead(A3),20,1000,16,0)<barevnyIndex1 || map(analogRead(A3),20,1000,16,0)>barevnyIndex1)
+  if(map(analogRead(A3),0,1000,16,0)<barevnyIndex1 || map(analogRead(A3),0,1000,16,0)>barevnyIndex1)
   {
     barevnyIndex1=map(analogRead(A3),20,1000,16,0);
     if(barevnyIndex1<0)
@@ -301,7 +298,7 @@ for (int i = 0;i<7;i++)
   
   delayMicroseconds(1);
   
-  if(map(analogRead(A4),20,1000,250,0)<padani || map(analogRead(A4),20,1000,250,0)>padani)
+  if(map(analogRead(A4),0,1000,250,0)<padani || map(analogRead(A4),0,1000,250,0)>padani)
   {
     padani=map(analogRead(A4),20,1000,250,0);
     if(padani<0)
@@ -312,7 +309,7 @@ for (int i = 0;i<7;i++)
   
   delayMicroseconds(1);
   
-  if(map(analogRead(A5),20,1000,255,0)<barvaTecky || map(analogRead(A5),20,900,255,0)>barvaTecky)
+  if(map(analogRead(A5),0,1000,255,0)<barvaTecky || map(analogRead(A5),0,900,255,0)>barvaTecky)
   {
     barvaTecky=map(analogRead(A5),20,1000,255,0);
     if(barvaTecky<0)
@@ -343,7 +340,7 @@ for (int i = 0;i<7;i++)
   {
   case 0:
   {
-    //fadeToBlackBy(ledky, pocetLED, 100);
+
     animace1();
   break;
   }
@@ -448,71 +445,12 @@ void animace1()
   int barevnyIndex=startIndex;
   for(int i = 0; i<pocetLED; i++) 
   {
-  ledky[i] = ColorFromPalette(RainbowColors_p, barevnyIndex, jas);
-  barevnyIndex+=5;
+  ledky[i] = ColorFromPalette(RainbowColors_p, barevnyIndex, 175);
+  barevnyIndex+=6;
   }
   FastLED.show();
 }
 
-/*
-void fade1() 
-{
-  
-  for( int i = 0; i < 50; i++) {
-    ledky[beatsin16(5,0,29)]=CHSV(barva+barevnyIndex,255,200);
-  }
-FastLED.show();
-}
-
-void fade2() 
-{
-
-  for(int i = 0; i < 50; i++) {
-    ledky[beatsin16(5,30,59)]=CHSV(barva+barevnyIndex,255,200);
-  }
-FastLED.show();
-}
-
-void fade3() 
-{
-  for(int i = 0; i < 50; i++) {
-    ledky[beatsin16(5,60,89)]=CHSV(barva+barevnyIndex,255,200);
-  }
-FastLED.show();
-}
-
-void fade4() 
-{
-  for(int i = 0; i < 50; i++) {
-    ledky[beatsin16(5,90,119)]=CHSV(barva+barevnyIndex,255,200);
-  }
-FastLED.show();
-}
-
-void fade5() 
-{
-  for(int i = 0; i < 50; i++) {
-    ledky[beatsin16(5,120,149)]=CHSV(barva+barevnyIndex, 255, 200);
-  }
-FastLED.show();
-}
-
-void fade6() 
-{
-  for(int i = 0; i < 50; i++) {
-    ledky[beatsin16(5,150,179)]=CHSV(barva+barevnyIndex, 255, 200);
-  }
-FastLED.show();
-}
-
-void fade7() 
-{
-  for(int i = 0; i < 50; i++) {
-    ledky[beatsin16(5,180,209)]=CHSV(barva+barevnyIndex, 255, 200);
-  }
-FastLED.show();
-}
-*/
 
 void zBoku1()
 {
@@ -536,8 +474,6 @@ void zBoku1()
       ledky[i]=CHSV(0,0,0);
     break;
     }
- 
-
   case 2:
     {
       for(int i=1;i<=4;i++)
@@ -556,7 +492,6 @@ void zBoku1()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 3:
     {
       for(int i=1;i<=4;i++)
@@ -575,7 +510,6 @@ void zBoku1()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 4:
     {
       for(int i=1;i<=4;i++)
@@ -594,7 +528,6 @@ void zBoku1()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 5:
     {
       for(int i=1;i<=4;i++)
@@ -613,7 +546,6 @@ void zBoku1()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 6:
     {
       for(int i=1;i<=4;i++)
@@ -632,7 +564,6 @@ void zBoku1()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 7:
     {
       for(int i=1;i<=4;i++)
@@ -677,8 +608,6 @@ void zBoku2()
       ledky[i]=CHSV(0,0,0);
     break;
     }
- 
-
   case 2:
     {
       for(int i=5;i<=8;i++)
@@ -697,7 +626,6 @@ void zBoku2()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 3:
     {
       for(int i=5;i<=8;i++)
@@ -716,7 +644,6 @@ void zBoku2()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 4:
     {
       for(int i=5;i<=8;i++)
@@ -735,7 +662,6 @@ void zBoku2()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 5:
     {
       for(int i=5;i<=8;i++)
@@ -754,7 +680,6 @@ void zBoku2()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 6:
     {
       for(int i=5;i<=8;i++)
@@ -773,7 +698,6 @@ void zBoku2()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 7:
     {
       for(int i=5;i<=8;i++)
@@ -818,8 +742,6 @@ void zBoku3()
       ledky[i]=CHSV(0,0,0);
     break;
     }
- 
-
   case 2:
     {
       for(int i=9;i<=12;i++)
@@ -838,7 +760,6 @@ void zBoku3()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 3:
     {
       for(int i=9;i<=12;i++)
@@ -857,7 +778,6 @@ void zBoku3()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 4:
     {
       for(int i=9;i<=12;i++)
@@ -876,7 +796,6 @@ void zBoku3()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 5:
     {
       for(int i=9;i<=12;i++)
@@ -895,7 +814,6 @@ void zBoku3()
         ledky[i]=CHSV(0,0,0);
      break;
     }
-
   case 6:
     {
       for(int i=9;i<=12;i++)
@@ -914,7 +832,6 @@ void zBoku3()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 7:
     {
      for(int i=9;i<=12;i++)
@@ -959,8 +876,6 @@ void zBoku4()
        ledky[i]=CHSV(0,0,0);
     break;
     }
- 
-
   case 2:
     {
      for(int i=13;i<=16;i++)
@@ -979,7 +894,6 @@ void zBoku4()
        ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 3:
     {
      for(int i=13;i<=16;i++)
@@ -998,7 +912,6 @@ void zBoku4()
        ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 4:
     {
      for(int i=13;i<=16;i++)
@@ -1017,7 +930,6 @@ void zBoku4()
        ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 5:
     {
      for(int i=13;i<=16;i++)
@@ -1036,7 +948,6 @@ void zBoku4()
        ledky[i]=CHSV(0,0,0);
      break;
     }
-
   case 6:
     {
      for(int i=13;i<=16;i++)
@@ -1055,7 +966,6 @@ void zBoku4()
        ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 7:
     {
      for(int i=13;i<=16;i++)
@@ -1100,8 +1010,6 @@ void zBoku5()
         ledky[i]=CHSV(0,0,0);
     break;
     }
- 
-
   case 2:
     {
       for(int i=17;i<=20;i++)
@@ -1120,7 +1028,6 @@ void zBoku5()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 3:
     {
       for(int i=17;i<=20;i++)
@@ -1139,7 +1046,6 @@ void zBoku5()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 4:
     {
       for(int i=17;i<=20;i++)
@@ -1158,7 +1064,6 @@ void zBoku5()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 5:
     {
       for(int i=17;i<=20;i++)
@@ -1177,7 +1082,6 @@ void zBoku5()
         ledky[i]=CHSV(0,0,0);
      break;
     }
-
   case 6:
     {
       for(int i=17;i<=20;i++)
@@ -1196,7 +1100,6 @@ void zBoku5()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 7:
     {
       for(int i=17;i<=20;i++)
@@ -1241,8 +1144,6 @@ void zBoku6()
         ledky[i]=CHSV(0,0,0);
     break;
     }
- 
-
   case 2:
     {
       for(int i=21;i<=24;i++)
@@ -1261,7 +1162,6 @@ void zBoku6()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 3:
     {
       for(int i=21;i<=24;i++)
@@ -1280,7 +1180,6 @@ void zBoku6()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 4:
     {
       for(int i=21;i<=24;i++)
@@ -1299,7 +1198,6 @@ void zBoku6()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 5:
     {
       for(int i=21;i<=24;i++)
@@ -1318,7 +1216,6 @@ void zBoku6()
         ledky[i]=CHSV(0,0,0);
      break;
     }
-
   case 6:
     {
       for(int i=21;i<=24;i++)
@@ -1337,7 +1234,6 @@ void zBoku6()
         ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 7:
     {
       for(int i=21;i<=24;i++)
@@ -1382,8 +1278,6 @@ void zBoku7()
          ledky[i]=CHSV(0,0,0);
     break;
     }
- 
-
   case 2:
     {
       for(int i=25;i<=28;i++)
@@ -1402,7 +1296,6 @@ void zBoku7()
          ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 3:
     {
       for(int i=25;i<=28;i++)
@@ -1421,7 +1314,6 @@ void zBoku7()
          ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 4:
     {
       for(int i=25;i<=28;i++)
@@ -1440,7 +1332,6 @@ void zBoku7()
          ledky[i]=CHSV(0,0,0);
       break;
     }
-
   case 5:
     {
       for(int i=25;i<=28;i++)
@@ -1459,7 +1350,6 @@ void zBoku7()
          ledky[i]=CHSV(0,0,0);
      break;
     }
-
   case 6:
     {
       for(int i=25;i<=28;i++)
@@ -1530,11 +1420,10 @@ void basy01()
       for(int i=poslednipeak1+1;i<=30;i++)
         ledky[i] = CHSV(0,0,0);
     }
-      
+
 // TOTO TEPRVE ZOBRAZI VIZUALNE BARVY    
 FastLED.show();
 }
-
 
 void basy02()
 {
@@ -2370,9 +2259,8 @@ void lcd1()
     lcd.print("+  VOLBA REZIMU ");
     lcd.setCursor(0,1);
     lcd.print("-  ANIMACE");
-    lcd.print("  (");
-    lcd.print(volba);
-    lcd.print(")   ");
+    lcd.print("  (0");
+    lcd.print(")");
     break;
   }
   case 1:
@@ -2390,7 +2278,7 @@ void lcd1()
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
     lcd.setCursor(0,1);
-    lcd.print("-       ");
+    lcd.print("-  ");
     lcd.print(volba);
     lcd.print("      ");
     break;
