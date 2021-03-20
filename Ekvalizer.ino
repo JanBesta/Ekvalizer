@@ -92,8 +92,7 @@ uint8_t startIndex = 0;
 
 void setup()
 {
-  Serial.begin(250000);
-  Wire.setClock(100000);
+  Serial.begin(230400);
   FastLED.addLeds<WS2812B,PINproLEDky, GRB>(ledky,pocetLED);
   Audio.Init();
   pinMode(12,OUTPUT);
@@ -242,7 +241,7 @@ for (int i = 0;i<7;i++)
   for (int i = 0;i<7;i++)
   {
     hodnotafrekvence[i]=constrain(hodnotafrekvence[i],0,1023);
-    frekvenceBarva[i]=map(hodnotafrekvence[i],145,1023,0,230);
+    frekvenceBarva[i]=map(hodnotafrekvence[i],0,1023,0,255);
     Serial.print(hodnotafrekvence[i]);//debugovani
     Serial.print(" ");
   }
@@ -267,9 +266,9 @@ for (int i = 0;i<7;i++)
   
   delayMicroseconds(1);
 
-  if(map(analogRead(A2),0,1000,255,0)<barva || map(analogRead(A2),0,1000,255,0>barva))
+  if(map(analogRead(A2),0,1023,255,0)<barva || map(analogRead(A2),0,1023,255,0>barva))
   {
-  barva=map(analogRead(A2),20,1000,255,0);
+  barva=map(analogRead(A2),00,1023,255,0);
     if(barva<0)
       barva=0;
     if(barva>255)
@@ -289,9 +288,9 @@ for (int i = 0;i<7;i++)
 
   delayMicroseconds(1);
   
-  if(map(analogRead(A3),0,1000,16,0)<barevnyIndex1 || map(analogRead(A3),0,1000,16,0)>barevnyIndex1)
+  if(map(analogRead(A3),0,1023,16,0)<barevnyIndex1 || map(analogRead(A3),0,1023,16,0)>barevnyIndex1)
   {
-    barevnyIndex1=map(analogRead(A3),20,1000,16,0);
+    barevnyIndex1=map(analogRead(A3),0,1023,16,0);
     if(barevnyIndex1<0)
       barevnyIndex1=0;
     if(barevnyIndex1>255)
@@ -302,7 +301,7 @@ for (int i = 0;i<7;i++)
   
   if(map(analogRead(A4),0,1023,300,25)<padani || map(analogRead(A4),0,1023,300,25)>padani)
   {
-    padani=map(analogRead(A4),00,1023,300,25);
+    padani=map(analogRead(A4),0,1023,300,25);
     if(padani<25)
       padani=25;
     if(padani>300)
@@ -311,9 +310,9 @@ for (int i = 0;i<7;i++)
   
   delayMicroseconds(1);
   
-  if(map(analogRead(A5),0,1000,255,0)<barvaTecky || map(analogRead(A5),0,900,255,0)>barvaTecky)
+  if(map(analogRead(A5),0,1023,255,0)<barvaTecky || map(analogRead(A5),0,1023,255,0)>barvaTecky)
   {
-    barvaTecky=map(analogRead(A5),20,1000,255,0);
+    barvaTecky=map(analogRead(A5),0,1023,255,0);
     if(barvaTecky<0)
       barvaTecky=0;
     if(barvaTecky>255)
