@@ -92,7 +92,8 @@ uint8_t startIndex = 0;
 
 void setup()
 {
-  Serial.begin(230400);
+  Serial.begin(115200);
+  Wire.setClock(100000);
   FastLED.addLeds<WS2812B,PINproLEDky, GRB>(ledky,pocetLED);
   Audio.Init();
   pinMode(12,OUTPUT);
