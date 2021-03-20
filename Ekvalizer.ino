@@ -3,13 +3,11 @@
 #include <AudioAnalyzer.h>
 #include <Wire.h>
 
-Analyzer Audio = Analyzer(12,13,0);//Strobe pin ->12  RST pin ->13 Analog Pin ->0
+Analyzer Audio = Analyzer(12,13,0);//STROBE pin ->12  RESET pin ->13 Analog Pin ->0
 //Verze 1.3 pro spektrální analyzer
 
 #define PINproLEDky 8
 #define pocetLED 210
-#define STROBE 4
-#define RESET 5
 
 //Promenne pro ekvalizer
 int hodnotafrekvence[7], frekvence[7], frekvence1[7], frekvence2[7], frekvenceZBoku[7], frekvenceBarva[7];
@@ -94,12 +92,12 @@ uint8_t startIndex = 0;
 
 void setup()
 {
-  Serial.begin(57600);
+  Serial.begin(250000);
   Wire.setClock(100000);
   FastLED.addLeds<WS2812B,PINproLEDky, GRB>(ledky,pocetLED);
   Audio.Init();
-  pinMode(STROBE,OUTPUT);
-  pinMode(RESET,OUTPUT);
+  pinMode(12,OUTPUT);
+  pinMode(13,OUTPUT);
   
   attachInterrupt(digitalPinToInterrupt(2),tlacitko1,RISING);
   attachInterrupt(digitalPinToInterrupt(3),tlacitko2,RISING);
@@ -258,16 +256,20 @@ for (int i = 0;i<7;i++)
   Serial.println(" ");
 
 
-  if(map(analogRead(A1),10,1000,255,00)<jas || map(analogRead(A1),10,1000,255,0)>jas)
+  if(map(analogRead(A1),0,1023,255,0)<jas || map(analogRead(A1),0,1023,255,0)>jas)
   {
-    jas=map(analogRead(A1),10,1000,255,0);
+    jas=map(analogRead(A1),0,1023,255,0);
+    if(jas<=0)
+      jas=0;
+    if(jas>255)
+      jas=255;
   }
   
   delayMicroseconds(1);
 
   if(map(analogRead(A2),0,1000,255,0)<barva || map(analogRead(A2),0,1000,255,0>barva))
   {
-  barva=map(analogRead(A2),50,1000,255,0);
+  barva=map(analogRead(A2),20,1000,255,0);
     if(barva<0)
       barva=0;
     if(barva>255)
@@ -276,9 +278,9 @@ for (int i = 0;i<7;i++)
     
   delayMicroseconds(1);
   
-  if(map(analogRead(A3),0,1000,10,0)<barevnyIndex || map(analogRead(A3),0,1000,10,0)>barevnyIndex)
+  if(map(analogRead(A3),0,1023,15,0)<barevnyIndex || map(analogRead(A3),0,1023,15,0)>barevnyIndex)
   {
-    barevnyIndex=map(analogRead(A3),20,1000,10,0);
+    barevnyIndex=map(analogRead(A3),0,1023,15,0);
     if(barevnyIndex<0)
       barevnyIndex=0;
     if(barevnyIndex>255)
@@ -298,13 +300,13 @@ for (int i = 0;i<7;i++)
   
   delayMicroseconds(1);
   
-  if(map(analogRead(A4),0,1000,250,0)<padani || map(analogRead(A4),0,1000,250,0)>padani)
+  if(map(analogRead(A4),0,1023,300,25)<padani || map(analogRead(A4),0,1023,300,25)>padani)
   {
-    padani=map(analogRead(A4),20,1000,250,0);
-    if(padani<0)
-      padani=0;
-    if(padani>250)
-      padani=250;
+    padani=map(analogRead(A4),00,1023,300,25);
+    if(padani<25)
+      padani=25;
+    if(padani>300)
+      padani=300;
   }
   
   delayMicroseconds(1);
@@ -439,7 +441,7 @@ void animace()
   int barevnyIndex=startIndex;
   for(int i = 0; i<pocetLED; i++) 
   {
-  ledky[i] = ColorFromPalette(RainbowColors_p, barevnyIndex, 175);
+  ledky[i] = ColorFromPalette(RainbowColors_p, barevnyIndex, jas);
   barevnyIndex+=6;
   }
   FastLED.show();
