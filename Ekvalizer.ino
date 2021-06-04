@@ -1,10 +1,10 @@
 #include <FastLED.h>
-#include <LiquidCrystal_I2C.h>
-#include <AudioAnalyzer.h>
-#include <Wire.h>
+#include <LiquidCrystal_I2C.h> // stazena knihovna umoznujici mi pracovat s LCD
+#include <AudioAnalyzer.h> //stazena knihovna umoznujici mi pracovat s modulem viz kapitola 8.1 Deska s cipem MSGEQ7
+#include <Wire.h> //pro nastaveni komunikace LCD pres piny SDA a SCL
 
 Analyzer Audio = Analyzer(12,13,0);//STROBE pin ->12  RESET pin ->13 Analog Pin ->0
-//Verze 1.3 pro spektrální analyzer
+//Verze 1.3 pro spektralni analyzer
 
 #define PINproLEDky 8
 #define pocetLED 210
@@ -13,10 +13,10 @@ Analyzer Audio = Analyzer(12,13,0);//STROBE pin ->12  RESET pin ->13 Analog Pin 
 int hodnotafrekvence[7], frekvence[7], frekvence1[7], frekvence2[7], frekvenceZBoku[7], frekvenceBarva[7];
 unsigned long jas;
 unsigned long padani;
-unsigned long barevnyIndex;
+unsigned long barevnyIndex, barevnyIndex1;
 unsigned long barva;
-unsigned long barvaTecky, barevnyIndex1;
-int volba=2;
+unsigned long barvaTecky;
+int volba=1;
 
 int poslednipeak1=0, poslednipeak2=0, poslednipeak3=0, poslednipeak4=0, poslednipeak5=0, poslednipeak6=0, poslednipeak7=0;
 unsigned long aktualniMillis, aktualniMillis1, predchoziMillis1=0, aktualniMillis2, predchoziMillis2=0, aktualniMillis3, predchoziMillis3=0, aktualniMillis4, predchoziMillis4=0, aktualniMillis5, predchoziMillis5=0, aktualniMillis6, predchoziMillis6=0, aktualniMillis7, predchoziMillis7=0;
@@ -76,7 +76,7 @@ void zBoku5();
 void zBoku6();
 void zBoku7();
 
-void animace1();
+void animace();
 
 void lcd1();
 
@@ -85,17 +85,16 @@ void tlacitko2();
 
 
 //LCD displej s I2C prevodnikem
-LiquidCrystal_I2C lcd(0x27,16,2);
+LiquidCrystal_I2C lcd(0x27,16,2); //typ,sloupce,radky
 
 //animacni mod
 uint8_t startIndex = 0;
 
 void setup()
 {
-  Serial.begin(115200);
-  Wire.setClock(100000);
-  FastLED.addLeds<WS2812B,PINproLEDky, GRB>(ledky,pocetLED);
-  Audio.Init();
+  Serial.begin(2000000); //nastaveni seriove komunikace. Diky tomuto kodu jsem jeste schopen urychlit dynamicnost ekvalizeru
+  FastLED.addLeds<WS2812B,PINproLEDky, GRB>(ledky,pocetLED); //Nastavi LED pasky - prida do databaze typ pasku, pocet LED, pin z ktereho pujdou data pro pasky a typ barevne kolaze 
+  Audio.Init(); //priradi modul s MSGEQ7 k arduino knihovne, kterou jsem taktez stahl z internetu viz kapitola 8.1 Deska s cipem MSGEQ7
   pinMode(12,OUTPUT);
   pinMode(13,OUTPUT);
   
@@ -109,8 +108,8 @@ void setup()
   pinMode(A4,INPUT);
   pinMode(A5,INPUT);
 
-  lcd.init();
-  lcd.backlight();
+  lcd.init(); //priradi I2C prevodnik LCD
+  lcd.backlight(); //zapne podscviceni LCD
   lcd.setCursor(0,0);
   lcd.print(" Prave probiha:");
   lcd.setCursor(1,1);
@@ -167,6 +166,10 @@ void setup()
   
   lcd.clear();
   delay(1000);
+  lcd.setCursor(0,0);
+  lcd.print("+  VOLBA REZIMU ");
+  lcd.setCursor(0,1);
+  lcd.print("-  ");
 }
 
 void loop()
@@ -264,8 +267,6 @@ for (int i = 0;i<7;i++)
     if(jas>255)
       jas=255;
   }
-  
-  delayMicroseconds(1);
 
   if(map(analogRead(A2),0,1023,255,0)<barva || map(analogRead(A2),0,1023,255,0>barva))
   {
@@ -275,78 +276,56 @@ for (int i = 0;i<7;i++)
     if(barva>255)
       barva=255;
   }
-    
-  delayMicroseconds(1);
   
   if(map(analogRead(A3),0,1023,15,0)<barevnyIndex || map(analogRead(A3),0,1023,15,0)>barevnyIndex)
   {
-    barevnyIndex=map(analogRead(A3),0,1023,15,0);
+    barevnyIndex=map(analogRead(A3),0,1023,12,0);
     if(barevnyIndex<0)
       barevnyIndex=0;
-    if(barevnyIndex>255)
-      barevnyIndex=255;
+    if(barevnyIndex>12)
+      barevnyIndex=12;
   }
-
-  delayMicroseconds(1);
   
   if(map(analogRead(A3),0,1023,16,0)<barevnyIndex1 || map(analogRead(A3),0,1023,16,0)>barevnyIndex1)
-  {
-    barevnyIndex1=map(analogRead(A3),0,1023,16,0);
-    if(barevnyIndex1<0)
-      barevnyIndex1=0;
-    if(barevnyIndex1>255)
-      barevnyIndex1=255;
-  }
-  
-  delayMicroseconds(1);
-  
-  if(map(analogRead(A4),0,1023,300,25)<padani || map(analogRead(A4),0,1023,300,25)>padani)
-  {
-    padani=map(analogRead(A4),0,1023,300,25);
-    if(padani<25)
-      padani=25;
-    if(padani>300)
-      padani=300;
-  }
-  
-  delayMicroseconds(1);
-  
-  if(map(analogRead(A5),0,1023,255,0)<barvaTecky || map(analogRead(A5),0,1023,255,0)>barvaTecky)
-  {
-    barvaTecky=map(analogRead(A5),0,1023,255,0);
-    if(barvaTecky<0)
-      barvaTecky=0;
-    if(barvaTecky>255)
-      barvaTecky=255;
-  }
-  
-  delayMicroseconds(1);
-
-  
-  Serial.print("Jas: ");
-  Serial.println(jas);
-  Serial.print("BarvenyIndex: ");
-  Serial.println(barevnyIndex);
-  Serial.print("Padani: ");
-  Serial.println(padani);
-  Serial.print("barva: ");
-  Serial.println(barva);
-  Serial.print("volba: ");
-  Serial.println(volba);
-  Serial.print("barvaTecky: ");
-  Serial.println(barvaTecky);
-  
-  lcd1();
+    {
+      barevnyIndex1=map(analogRead(A3),0,1023,16,0);
+      if(barevnyIndex1<0)
+        barevnyIndex1=0;
+      if(barevnyIndex1>16)
+        barevnyIndex1=16;
+    }
+    
+    if(map(analogRead(A4),0,1023,300,25)<padani || map(analogRead(A4),0,1023,300,25)>padani)
+    {
+      padani=map(analogRead(A4),0,1023,300,25);
+      if(padani<25)
+        padani=25;
+      if(padani>300)
+        padani=300;
+    }
+    
+    if(map(analogRead(A5),0,1023,255,0)<barvaTecky || map(analogRead(A5),0,1023,255,0)>barvaTecky)
+    {
+      barvaTecky=map(analogRead(A5),0,1023,255,0);
+      if(barvaTecky<0)
+        barvaTecky=0;
+      if(barvaTecky>255)
+        barvaTecky=255;
+    }
   
   switch(volba)
   {
-  case 1:
+  case 0:
   {
+    lcd.setCursor(8,1);
+    lcd.print(volba);
     animace();
   break;
   }
-  case 2:
+  case 1:
   {
+    lcd.setCursor(8,1);
+    lcd.print(volba);
     basy01();
     basy02();
     basy03();
@@ -356,8 +335,10 @@ for (int i = 0;i<7;i++)
     vysky02();
    break;
    }
-   case 3:
+   case 2:
    {
+     lcd.setCursor(8,1);
+     lcd.print(volba);
      basy11();
      basy12();
      basy13();
@@ -367,77 +348,85 @@ for (int i = 0;i<7;i++)
      vysky12();
    break;
    }
+   case 3:
+   {
+     lcd.setCursor(8,1);
+     lcd.print(volba);
+     basy21();
+     basy22();
+     basy23();
+     stredy21();
+     stredy22();
+     vysky21();
+     vysky22();
+   break;
+   }
    case 4:
    {
-    basy21();
-    basy22();
-    basy23();
-    stredy21();
-    stredy22();
-    vysky21();
-    vysky22();
+     lcd.setCursor(8,1);
+     lcd.print(volba);
+     basybasic1();
+     basybasic2();
+     basybasic3();
+     stredybasic1();
+     stredybasic2();
+     vyskybasic1();
+     vyskybasic2();
    break;
+   }
    case 5:
    {
-    basybasic1();
-    basybasic2();
-    basybasic3();
-    stredybasic1();
-    stredybasic2();
-    vyskybasic1();
-    vyskybasic2();
+     lcd.setCursor(8,1);
+     lcd.print(volba);
+     basybasic11();
+     basybasic12();
+     basybasic13();
+     stredybasic11();
+     stredybasic12();
+     vyskybasic11();
+     vyskybasic12();
    break;
    }
    case 6:
    {
-    basybasic11();
-    basybasic12();
-    basybasic13();
-    stredybasic11();
-    stredybasic12();
-    vyskybasic11();
-    vyskybasic12();
+     lcd.setCursor(8,1);
+     lcd.print(volba);
+     ledky[0]=CHSV(0,0,0);
+     ledky[30]=CHSV(0,0,0);
+     ledky[60]=CHSV(0,0,0);
+     ledky[90]=CHSV(0,0,0);
+     ledky[120]=CHSV(0,0,0);
+     ledky[150]=CHSV(0,0,0);
+     ledky[180]=CHSV(0,0,0);
+     zBoku1();
+     zBoku2();
+     zBoku3();
+     zBoku4();
+     zBoku5();
+     zBoku6();
+     zBoku7();
    break;
    }
-   case 7:
-   {
-    ledky[0]=CHSV(0,0,0);
-    ledky[30]=CHSV(0,0,0);
-    ledky[60]=CHSV(0,0,0);
-    ledky[90]=CHSV(0,0,0);
-    ledky[120]=CHSV(0,0,0);
-    ledky[150]=CHSV(0,0,0);
-    ledky[180]=CHSV(0,0,0);
-    zBoku1();
-    zBoku2();
-    zBoku3();
-    zBoku4();
-    zBoku5();
-    zBoku6();
-    zBoku7();
-   break;
-   }
-  }
  }
 }
 
 void tlacitko1()
 {
   volba++;
-  if(volba>7)
-    volba=7;
+  if(volba>6)
+    volba=6;
 }
 
 void tlacitko2()
 {
   volba--;
-  if(volba<1)
-    volba=1;
+  if(volba<0)
+    volba=0;
 }
 
 void animace()
 {
-  startIndex = startIndex + 8;
+  startIndex = startIndex + 4;
   int barevnyIndex=startIndex;
   for(int i = 0; i<pocetLED; i++) 
   {
@@ -1387,37 +1376,37 @@ void zBoku7()
  FastLED.show();
 }
 
+//Všechny níže zmíněné proměnné jsou očíslovány, protože nebylo možné používat jen jednu proměnnou
 void basy01()
 {
-  //naprogramovani ktere ledky maji svitit (vizualni zobrazeni je az na konci fce) podle ctene hodnoty frekvence)
+  //naprogramování ktere ledky mají svítit podle čtené hodnoty frekvence (vizualni zobrazeni je až na konci funkce))
   for(int i=0;i<=frekvence[0];i++)
     {
-      //nastaveni barvy,saturace a jasu
+      //nastavení barvy, saturace a jasu
       ledky[i] = CHSV(barva+(barevnyIndex*i),255,jas);
 
-      // podminka, ktera mi nastavi peak na nejvyssi hodnotu pokud je vyssi nez predtim (+1 protoze by se mi prekryvaly modra a cerevena)
+      //podmínka, která mi nastaví bod na nejvyšší hodnotu pokud je vyšší nez předtím (+1 protože by se mi překryval bod s nejvyššíi čtenou hodnotou)
       if(poslednipeak1<i)
         poslednipeak1=i+1;
 
       aktualniMillis1=millis();
-      //podminka, ktera dela padani tecky
+      //podmínka, která dělá padání tečky (tato podmínka se používá pokud chceme aby arduino dělalo "2 věci najednou")
       if(aktualniMillis1-predchoziMillis1>padani)
       {
         poslednipeak1--;
         predchoziMillis1=aktualniMillis1;
       }
       
-      ledky[poslednipeak1]=CHSV(barvaTecky,255,jas); //nastaveni barvy tecky a stjeneho jasu jak jsou ostatni ledky
+      ledky[poslednipeak1]=CHSV(barvaTecky,255,jas); //nastavení barvy bodu a stejného jasu jako jsou ostatní LEDky
 
-      
-      //1. for - zhasina ledky mezi peakem a LEDkami, ktere jezdi podle hodnoty; 2. for - zhasina od peaku do konce pasku (+1 protoze by mi jinak zhasl i ten peak)
+      //1. for - zhasina ledky mezi bodem a LEDkami, ktere jezdi podle hodnoty a 2. for zhasina od bodu do konce pasku (+1 protoze by mi jinak zhasl i ten daný bod)
       for(int i=frekvence[0];i<poslednipeak1;i++)
         ledky[i] = CHSV(0,0,0);
       for(int i=poslednipeak1+1;i<=29;i++)
         ledky[i] = CHSV(0,0,0);
     }
 
-// TOTO TEPRVE ZOBRAZI VIZUALNE BARVY    
+//Tato funkce teprve vizuálně zobrazí všechny LED
 FastLED.show();
 }
 
@@ -2249,7 +2238,7 @@ void lcd1()
 {
   switch(volba)
   {
-  case 1:
+  case 0:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
@@ -2258,7 +2247,7 @@ void lcd1()
     lcd.print("  (0)  ");
     break;
   }
-  case 2:
+  case 1:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
@@ -2267,7 +2256,7 @@ void lcd1()
     lcd.print("  (1)  ");
     break;
   }
-  case 3:
+  case 2:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
@@ -2276,7 +2265,7 @@ void lcd1()
     lcd.print("        ");
     break;
   }
-  case 4:
+  case 3:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
@@ -2285,7 +2274,7 @@ void lcd1()
     lcd.print("         ");
     break;
   }
-  case 5:
+  case 4:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
@@ -2296,7 +2285,7 @@ void lcd1()
     break;
     
   }
-  case 6:
+  case 5:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
@@ -2305,7 +2294,7 @@ void lcd1()
     lcd.print("         ");
     break;
   }
-  case 7:
+  case 6:
   {
     lcd.setCursor(0,0);
     lcd.print("+  VOLBA REZIMU ");
