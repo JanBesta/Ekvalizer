@@ -1,4 +1,4 @@
-#include <FastLED.h>
+ #include <FastLED.h>
 #include <LiquidCrystal_I2C.h> // stazena knihovna umoznujici mi pracovat s LCD
 #include <AudioAnalyzer.h> //stazena knihovna umoznujici mi pracovat s modulem viz kapitola 8.1 Deska s cipem MSGEQ7
 #include <Wire.h> //pro nastaveni komunikace LCD pres piny SDA a SCL
@@ -11,19 +11,52 @@ Analyzer Audio = Analyzer(12,13,0);//STROBE pin ->12  RESET pin ->13 Analog Pin 
 #define PINproLEDkypodsviceni 9
 #define pocetLEDpodsviceni 66
 
+#define BRIGHTNESS  200
+#define SPARKING 120
+#define COOLING  55
+#define UPDATES_PER_SECOND 100
+#define FRAMES_PER_SECOND  60
+
+#define TOLERANCE 7
+#define TOLERANCE_INDEX 1
+
+// Gradient palette "bhw2_turq_gp", originally from
+// http://soliton.vm.bytemark.co.uk/pub/cpt-city/bhw/bhw2/tn/bhw2_turq.png.index.html
+// converted for FastLED with gammas (2.6, 2.2, 2.5)
+// Size: 28 bytes of program space.
+
+DEFINE_GRADIENT_PALETTE( bhw2_turq_gp ) {
+    0,   1, 33, 95,
+   38,   1,107, 37,
+   76,  42,255, 45,
+  127, 255,255, 45,
+  178,  42,255, 45,
+  216,   1,107, 37,
+  255,   1, 33, 95};
+
+CRGBPalette16 moje=bhw2_turq_gp;
+CRGBPalette16 gPal;
+
+uint8_t gCurrentPatternNumber = 0; // Index number of which pattern is current
+uint8_t gHue = 0; // rotating "base color" used by many of the patterns
+
 //Promenne pro ekvalizer
-int hodnotafrekvence[7], frekvence[7], frekvence1[7], frekvence2[7], frekvenceZBoku[7], frekvenceBarva[7];
+int hodnotafrekvence[7], frekvence[7], frekvence1[7], frekvence2[7], frekvenceZBoku[7];
 unsigned long jas;
 unsigned long padani;
 unsigned long barevnyIndex, barevnyIndex1;
 unsigned long barva;
 unsigned long barvaTecky;
-int volba=1;
+int volba=1, volbaPodsviceni=0, rezimPodsviceni=0;
+bool gReverseDirection = false;
+int JAS=255;
 
-unsigned int BasJas=0, StredyJas=0, VyskyJas=0, predchoziMillis=0, AktualniMillis=0;
+unsigned int BasJas=0, StredyJas=0, VyskyJas=0;
+unsigned int posledniVolba=1, poslednirezimPodsviceni=0, posledniJas=0, posledniBarva=0, posledniBarevnyIndex=0, posledniBarevnyIndex1=0, posledniPadani=0, posledniBarvaTecky=0;
+unsigned int rozdilVolba, rozdilRezimPodsviceni, rozdilJas, rozdilBarva, rozdilBarevnyIndex, rozdilBarevnyIndex1, rozdilPadani, rozdilBarvaTecky;
 
 int poslednipeak1=0, poslednipeak2=0, poslednipeak3=0, poslednipeak4=0, poslednipeak5=0, poslednipeak6=0, poslednipeak7=0;
-unsigned long aktualniMillis, aktualniMillis1, predchoziMillis1=0, aktualniMillis2, predchoziMillis2=0, aktualniMillis3, predchoziMillis3=0, aktualniMillis4, predchoziMillis4=0, aktualniMillis5, predchoziMillis5=0, aktualniMillis6, predchoziMillis6=0, aktualniMillis7, predchoziMillis7=0;
+unsigned long aktualniMillis, predchoziMillis=0, aktualniMillis1, predchoziMillis1=0, aktualniMillis2, predchoziMillis2=0, aktualniMillis3, predchoziMillis3=0, aktualniMillis4, predchoziMillis4=0, aktualniMillis5, predchoziMillis5=0, aktualniMillis6, predchoziMillis6=0, aktualniMillis7, predchoziMillis7=0;
 
 long poslednipeak011=0, poslednipeak012=0, poslednipeak111=0, poslednipeak112=0, poslednipeak211=0, poslednipeak212=0, poslednipeak311=0, poslednipeak312=0, poslednipeak411=0, poslednipeak412=0, poslednipeak511=0, poslednipeak512=0, poslednipeak611=0, poslednipeak612=0;
 unsigned long aktualniMillis011, predchoziMillis011=0, aktualniMillis012, predchoziMillis012=0, aktualniMillis111, predchoziMillis111=0, aktualniMillis112, predchoziMillis112=0, aktualniMillis211, predchoziMillis211=0, aktualniMillis212, predchoziMillis212=0; 
@@ -82,11 +115,27 @@ void zBoku6();
 void zBoku7();
 
 void animace();
+
+void Fire2012WithPalette();
 void animacePodsviceni();
+void toceniLedekbila();
+void toceniLedekbarva();
+void prolinani();
+void rainbow() ;
+void rainbowWithGlitter();
+void addGlitter( fract8 chanceOfGlitter);
+void confetti();
+void sinelon();
+void bpm();
+void juggle();
+void second_light();
+void cylon();
+void fadeall();
 
 void tlacitko1();
 void tlacitko2();
 
+void lcdfunkce();
 
 //LCD displej s I2C prevodnikem
 LiquidCrystal_I2C lcd(0x27,16,2); //typ,sloupce,radky
@@ -115,89 +164,38 @@ void setup()
   pinMode(A3,INPUT);
   pinMode(A4,INPUT);
   pinMode(A5,INPUT);
-
+  
+  gPal = HeatColors_p;
+  
   lcd.init(); //priradi I2C prevodnik LCD
   lcd.backlight(); //zapne podscviceni LCD
   lcd.setCursor(0,0);
-  lcd.print(" Prave probiha:");
+  lcd.print(" Prave probiha: ");
   lcd.setCursor(1,1);
   lcd.print("Test LED Pasku");
   
-  for(int i = 0;i<30;i++)
+  for(int i = 0;i<pocetLED;i++)
   {
-    ledky[i] = CHSV(0,255,100);
-    delay(20);
+    ledky[i] = CHSV(120+(7*i),255,100);
+    for(int j=0;j<pocetLEDpodsviceni;j++) 
+    {
+      ledkyPodsviceni[j]=CHSV(0+(4*j),255,150);
+    }
     FastLED.show();
   }
-  for(int i = 30;i<60;i++)
-  {
-    ledky[i] = CHSV(74,255,100);
-    delay(20);
-    FastLED.show();
-  }
-  for(int i = 60;i<90;i++)
-  {
-    ledky[i] = CHSV(111,255,100);
-    delay(20);
-    FastLED.show();
-  }
-  for(int i = 90;i<120;i++)
-  {
-    ledky[i] = CHSV(37,255,100);
-    delay(20);
-    FastLED.show();
-  }
-  for(int i = 120;i<150;i++)
-  {
-    ledky[i] = CHSV(222,255,100);
-    delay(20);
-    FastLED.show();
-  }
-  for(int i = 150;i<180;i++)
-  {
-    ledky[i] = CHSV(50,255,100);
-    delay(20);
-    FastLED.show();
-  }
-  for(int i = 180;i<210;i++)
-  {
-    ledky[i] = CHSV(148,255,100);
-    delay(20);
-    FastLED.show();
-  }
-  delay(100);
-  for(int i = 0;i<210;i++)
-  {
-    ledky[i] = CHSV(0,0,0);
-  }
-  FastLED.show();
-
-  ledkyPodsviceni[0]=CHSV(0,255,80);
-  for(int i=1;i<66;i++) 
-  {
-    ledkyPodsviceni[i]=CHSV(0+(4*i),255,80);
-    FastLED.show();
-    delay(20);
-  }
-  for(int i=0;i<66;i++)
-  {
-    ledkyPodsviceni[i]=CHSV(0,0,0);
-  }
-  FastLED.show();
   
-  for(int i=66;i>0;i--) 
+  for(int i=0;i<pocetLED;i++)
   {
-    ledkyPodsviceni[i]=CHSV(0+(4*i),255,80);
-    FastLED.show();
-    delay(20);
+    for(int j=0;j<pocetLEDpodsviceni;j++) 
+    {
+      ledky[i]=CRGB(0,0,0);
+      ledkyPodsviceni[j]=CRGB(0,0,0);
+    }
   }
+  FastLED.show();
   
   lcd.clear();
   delay(1000);
-  lcd.setCursor(0,0);
-  lcd.print("+  VOLBA REZIMU ");
-  lcd.setCursor(0,1);
-  lcd.print("-  ");
 }
 
 void loop()
@@ -270,22 +268,6 @@ for (int i = 0;i<7;i++)
   }
   Serial.println(" ");
 
-  for (int i = 0;i<7;i++)
-  {
-    hodnotafrekvence[i]=constrain(hodnotafrekvence[i],0,1023);
-    frekvenceBarva[i]=map(hodnotafrekvence[i],0,1023,0,255);
-    Serial.print(hodnotafrekvence[i]);//debugovani
-    Serial.print(" ");
-  }
-  Serial.println(" ");
-  
-  for(int i=0;i<=6;i++)
-  {
-    Serial.print(frekvenceBarva[i]);
-    Serial.print(" ");
-  }
-  Serial.println(" ");
-
 
   if(map(analogRead(A1),0,1023,255,0)<jas || map(analogRead(A1),0,1023,255,0)>jas)
   {
@@ -297,8 +279,8 @@ for (int i = 0;i<7;i++)
   }
 
   if(map(analogRead(A2),0,1023,255,0)<barva || map(analogRead(A2),0,1023,255,0>barva))
-  {
-  barva=map(analogRead(A2),00,1023,255,0);
+  { 
+    barva=map(analogRead(A2),00,1023,255,0);
     if(barva<0)
       barva=0;
     if(barva>255)
@@ -323,7 +305,7 @@ for (int i = 0;i<7;i++)
         barevnyIndex1=16;
     }
     
-    if(map(analogRead(A4),0,1023,300,25)<padani || map(analogRead(A4),0,1023,300,25)>padani)
+  if(map(analogRead(A4),0,1023,300,25)<padani || map(analogRead(A4),0,1023,300,25)>padani)
     {
       padani=map(analogRead(A4),0,1023,300,25);
       if(padani<25)
@@ -332,7 +314,7 @@ for (int i = 0;i<7;i++)
         padani=300;
     }
     
-    if(map(analogRead(A5),0,1023,255,0)<barvaTecky || map(analogRead(A5),0,1023,255,0)>barvaTecky)
+  if(map(analogRead(A5),0,1023,255,0)<barvaTecky || map(analogRead(A5),0,1023,255,0)>barvaTecky)
     {
       barvaTecky=map(analogRead(A5),0,1023,255,0);
       if(barvaTecky<0)
@@ -340,7 +322,570 @@ for (int i = 0;i<7;i++)
       if(barvaTecky>255)
         barvaTecky=255;
     }
+  rozdilVolba=abs(volba-posledniVolba);
+  rozdilRezimPodsviceni=abs(rezimPodsviceni-poslednirezimPodsviceni);
+  rozdilJas=abs(jas-posledniJas);
+  rozdilBarva=abs(barva-posledniBarva);
+  rozdilBarevnyIndex=abs(barevnyIndex-posledniBarevnyIndex);
+  rozdilBarevnyIndex1=abs(barevnyIndex1-posledniBarevnyIndex1);
+  rozdilPadani=abs(padani-posledniPadani);
+  rozdilBarvaTecky=abs(barvaTecky-posledniBarvaTecky);
+  
+    if(rozdilJas>TOLERANCE)
+    {
+        lcd.clear();
+        lcd.setCursor(3,0);
+        lcd.print("Menite jas");
+        lcd.setCursor(4,1);
+        lcd.print("JAS:");
+        lcd.print(jas);
+        posledniJas=jas;
+    }
+    if(rozdilBarva>TOLERANCE)
+    {
+        lcd.clear();
+        lcd.setCursor(2,0);
+        lcd.print("Menite barvu");
+        lcd.setCursor(3,1);
+        lcd.print("BARVA:");
+        lcd.print(barva);
+        posledniBarva=barva;
+    }
+    if(rozdilBarevnyIndex>TOLERANCE_INDEX)
+    {
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Menite barvIndex");
+        lcd.setCursor(0,1);
+        lcd.print("BAREVNY INDEX:");
+        lcd.print(barevnyIndex);
+        posledniBarevnyIndex=barevnyIndex;
+    }
+    if(volba==2)
+    {
+      if(rozdilBarevnyIndex1>TOLERANCE_INDEX)
+      {
+          lcd.clear();
+          lcd.setCursor(0,0);
+          lcd.print("Menite barvIndex");
+          lcd.setCursor(0,1);
+          lcd.print("BAREVNY INDEX:");
+          lcd.print(barevnyIndex1);
+          posledniBarevnyIndex1=barevnyIndex1;
+      }
+    }
+    if(rozdilPadani>TOLERANCE)
+    {
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Menite rych bodu");
+        lcd.setCursor(1,1);
+        lcd.print("RYCHL BODU:");
+        lcd.print(padani);
+        posledniPadani=padani;
+    }
+    if(rozdilBarvaTecky>TOLERANCE)
+    {
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Menite barv bodu");
+        lcd.setCursor(1,1);
+        lcd.print("BARVA BODU:");
+        lcd.print(barvaTecky);
+        posledniBarvaTecky=barvaTecky;
+    }
+  aktualniMillis=millis();
+  if(aktualniMillis-predchoziMillis>4000)
+  {
+    lcdfunkce();
+    predchoziMillis=aktualniMillis;
+  }
+  else if(rozdilVolba>TOLERANCE_INDEX || rozdilRezimPodsviceni>TOLERANCE_INDEX)
+    {
+      lcdfunkce();
+    }
+  
+  EVERY_N_MILLISECONDS( 20 ) { gHue++; }
+  EVERY_N_SECONDS( 20 ) { volbaPodsviceni++; }
+  
+  if(volbaPodsviceni>3)
+    volbaPodsviceni=0;
+  
+  switch(volba)
+  {
+    case 0:
+    {
+      //Fire2012WithPalette();
+      animace();
+      switch(rezimPodsviceni)
+      {
+        case 0:
+        {
+          animacePodsviceni();
+        }
+        break;
+        case 1:
+        {
+          switch(volbaPodsviceni)
+          {
+            case 1:
+            {
+              confetti();
+            }
+            break;
+            case 2:
+            {
+              rainbowWithGlitter();
+            }
+            break;
+          }
+        }
+        break;
+      }
+    }
+    FastLED.show();
+    break;
+    case 1:
+    {
+      basy01();
+      basy02();
+      basy03();
+      stredy01();
+      stredy02();
+      vysky01();
+      vysky02();
+      switch(rezimPodsviceni)
+      {
+        case 0:
+        {
+          animacePodsviceni();
+        }
+        break;
+        case 1:
+        {
+          switch(volbaPodsviceni)
+          {
+            case 1:
+            {
+              confetti();
+            }
+            break;
+            case 2:
+            {
+              rainbowWithGlitter();
+            }
+            break;
+            case 3:
+            {
+              sinelon();
+            }
+            break;
+          }
+        }
+        break;
+      }
+    }
+    FastLED.show();
+    break;
+    case 2:
+    {
+      basy11();
+      basy12();
+      basy13();
+      stredy11();
+      stredy12();
+      vysky11();
+      vysky12();
+      switch(rezimPodsviceni)
+      {
+        case 0:
+        {
+          animacePodsviceni();
+        }
+        break;
+        case 1:
+        {
+          switch(volbaPodsviceni)
+          {
+            case 1:
+            {
+              confetti();
+            }
+            break;
+            case 2:
+            {
+              rainbowWithGlitter();
+            }
+            break;
+            case 3:
+            {
+              sinelon();
+            }
+            break;
+          }
+        }
+        break;
+      }
+    }
+    FastLED.show();
+    break;
+    case 3:
+    {
+      basy21();
+      basy22();
+      basy23();
+      stredy21();
+      stredy22();
+      vysky21();
+      vysky22();
+      switch(rezimPodsviceni)
+      {
+        case 0:
+        {
+          animacePodsviceni();
+        }
+        break;
+        case 1:
+        {
+          switch(volbaPodsviceni)
+          {
+            case 1:
+            {
+              confetti();
+            }
+            break;
+            case 2:
+            {
+              rainbowWithGlitter();
+            }
+            break;
+            case 3:
+            {
+              sinelon();
+            }
+            break;
+          }
+        }
+        break;
+      }
+    }
+    FastLED.show();
+    break;
+    case 4:
+    {
+      basybasic1();
+      basybasic2();
+      basybasic3();
+      stredybasic1();
+      stredybasic2();
+      vyskybasic1();
+      vyskybasic2();
+      switch(rezimPodsviceni)
+      {
+        case 0:
+        {
+          animacePodsviceni();
+        }
+        break;
+        case 1:
+        {
+          switch(volbaPodsviceni)
+          {
+            case 1:
+            {
+              confetti();
+            }
+            break;
+            case 2:
+            {
+              rainbowWithGlitter();
+            }
+            break;
+            case 3:
+            {
+              sinelon();
+            }
+            break;
+          }
+        }
+        break;
+      }
+    }
+    FastLED.show();
+    break;
+    case 5:
+    {
+      basybasic11();
+      basybasic12();
+      basybasic13();
+      stredybasic11();
+      stredybasic12();
+      vyskybasic11();
+      vyskybasic12();
+      switch(rezimPodsviceni)
+      {
+        case 0:
+        {
+          animacePodsviceni();
+        }
+        break;
+        case 1:
+        {
+          switch(volbaPodsviceni)
+          {
+            case 1:
+            {
+              confetti();
+            }
+            break;
+            case 2:
+            {
+              rainbowWithGlitter();
+            }
+            break;
+            case 3:
+            {
+              sinelon();
+            }
+            break;
+          }
+        }
+        break;
+      }
+    }
+    FastLED.show();
+    break;
+    case 6:
+    {
+      ledky[0]=CHSV(0,0,0);
+      ledky[30]=CHSV(0,0,0);
+      ledky[60]=CHSV(0,0,0);
+      ledky[90]=CHSV(0,0,0);
+      ledky[120]=CHSV(0,0,0);
+      ledky[150]=CHSV(0,0,0);
+      ledky[180]=CHSV(0,0,0);
+      zBoku1();
+      zBoku2();
+      zBoku3();
+      zBoku4();
+      zBoku5();
+      zBoku6();
+      zBoku7();
+      switch(rezimPodsviceni)
+      {
+        case 0:
+        {
+          animacePodsviceni();
+        }
+        break;
+        case 1:
+        {
+          switch(volbaPodsviceni)
+          {
+            case 1:
+            {
+              confetti();
+            }
+            break;
+            case 2:
+            {
+              rainbowWithGlitter();
+            }
+            break;
+            case 3:
+            {
+              sinelon();
+            }
+            break;
+          }
+        }
+        break;
+      }
+    }
+    FastLED.show();
+    break;
+  }
+}
+
+void tlacitko1()
+{
+  volba++;
+  if(volba>6)
+    volba=0;
+}
+
+void tlacitko2()
+{
+  rezimPodsviceni=!rezimPodsviceni;
+}
+
+void lcdfunkce()
+{
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("REZIM VIZUAL:");
+  lcd.setCursor(14,0);
+  lcd.print(volba);
+  lcd.setCursor(0,1);
+  lcd.print("REZIM PODSVIC:");
+  lcd.setCursor(15,1);
+  lcd.print(rezimPodsviceni);
+}
+
+
+void animace()
+{
+  startIndexRezim = startIndexRezim + 4;
+  int barevnyIndexRezim=startIndexRezim;
+  for(int i = 0; i<pocetLED; i++) 
+  {
+  ledky[i] = ColorFromPalette(RainbowColors_p, barevnyIndexRezim, jas);
+  barevnyIndexRezim+=6;
+  }
+  FastLED.show();
+}
+
+void Fire2012WithPalette()
+{
+// Array of temperature readings at each simulation cell
+  static byte heat[210];
+
+  // Step 1.  Cool down every cell a little
+    for( int i = 0; i < 30; i++)
+      heat[i] = qsub8( heat[i],  random8(0, ((COOLING * 10) / 30) + 2));
+    for( int i = 30; i < 60; i++)
+      heat[i] = qsub8( heat[i],  random8(0, ((COOLING * 10) / 60) + 2));
+    for( int i = 60; i < 90; i++)
+      heat[i] = qsub8( heat[i],  random8(0, ((COOLING * 10) / 90) + 2));
+    for( int i = 90; i < 120; i++)
+      heat[i] = qsub8( heat[i],  random8(0, ((COOLING * 10) / 120) + 2));
+    for( int i = 120; i < 150; i++)
+      heat[i] = qsub8( heat[i],  random8(0, ((COOLING * 10) / 150) + 2));
+    for( int i = 150; i < 180; i++)
+      heat[i] = qsub8( heat[i],  random8(0, ((COOLING * 10) / 180) + 2));
+    for( int i = 180; i < 210; i++)
+      heat[i] = qsub8( heat[i],  random8(0, ((COOLING * 10) / 210) + 2));
+  
+    // Step 2.  Heat from each cell drifts 'up' and diffuses a little
+    for( int k= 30 - 1; k >= 2; k--)
+      heat[k] = (heat[k - 1] + heat[k - 2] + heat[k - 2] ) / 3;
+    for( int k= 60 - 1; k >= 4; k--)
+      heat[k] = (heat[k - 1] + heat[k - 2] + heat[k - 2] ) / 3;
+    for( int k= 90 - 1; k >= 6; k--)
+      heat[k] = (heat[k - 1] + heat[k - 2] + heat[k - 2] ) / 3;
+    for( int k= 120 - 1; k >= 8; k--)
+      heat[k] = (heat[k - 1] + heat[k - 2] + heat[k - 2] ) / 3;
+    for( int k= 150 - 1; k >= 10; k--)
+      heat[k] = (heat[k - 1] + heat[k - 2] + heat[k - 2] ) / 3;
+    for( int k= 180 - 1; k >= 12; k--)
+      heat[k] = (heat[k - 1] + heat[k - 2] + heat[k - 2] ) / 3;
     
+    // Step 3.  Randomly ignite new 'sparks' of heat near the bottom
+    if( random8() < SPARKING ) {
+      int y = random8(7);
+      heat[y] = qadd8( heat[y], random8(160,255) );
+    }
+
+    // Step 4.  Map from heat cells to LED colors
+    for( int j = 0; j < 30; j++) {
+      // Scale the heat value from 0-255 down to 0-240
+      // for best results with color palettes.
+      byte colorindex = scale8( heat[j], 240);
+      CRGB color = ColorFromPalette( gPal, colorindex);
+      int pixelnumber;
+      if( gReverseDirection ) {
+        pixelnumber = (30-1) - j;
+      } else {
+        pixelnumber = j;
+      }
+      ledky[pixelnumber] = color;
+    }
+    for( int j = 30; j < 60; j++) {
+      // Scale the heat value from 0-255 down to 0-240
+      // for best results with color palettes.
+      byte colorindex = scale8( heat[j], 240);
+      CRGB color = ColorFromPalette( gPal, colorindex);
+      int pixelnumber;
+      if( gReverseDirection ) {
+        pixelnumber = (60-1) - j;
+      } else {
+        pixelnumber = j;
+      }
+      ledky[pixelnumber] = color;
+    }
+    for( int j = 60; j < 90; j++) {
+      // Scale the heat value from 0-255 down to 0-240
+      // for best results with color palettes.
+      byte colorindex = scale8( heat[j], 240);
+      CRGB color = ColorFromPalette( gPal, colorindex);
+      int pixelnumber;
+      if( gReverseDirection ) {
+        pixelnumber = (90-1) - j;
+      } else {
+        pixelnumber = j;
+      }
+      ledky[pixelnumber] = color;
+    }
+    for( int j = 90; j < 120; j++) {
+      // Scale the heat value from 0-255 down to 0-240
+      // for best results with color palettes.
+      byte colorindex = scale8( heat[j], 240);
+      CRGB color = ColorFromPalette( gPal, colorindex);
+      int pixelnumber;
+      if( gReverseDirection ) {
+        pixelnumber = (120-1) - j;
+      } else {
+        pixelnumber = j;
+      }
+      ledky[pixelnumber] = color;
+    }
+    for( int j = 120; j < 150; j++) {
+      // Scale the heat value from 0-255 down to 0-240
+      // for best results with color palettes.
+      byte colorindex = scale8( heat[j], 240);
+      CRGB color = ColorFromPalette( gPal, colorindex);
+      int pixelnumber;
+      if( gReverseDirection ) {
+        pixelnumber = (150-1) - j;
+      } else {
+        pixelnumber = j;
+      }
+      ledky[pixelnumber] = color;
+    }
+    for( int j = 150; j < 180; j++) {
+      // Scale the heat value from 0-255 down to 0-240
+      // for best results with color palettes.
+      byte colorindex = scale8( heat[j], 240);
+      CRGB color = ColorFromPalette( gPal, colorindex);
+      int pixelnumber;
+      if( gReverseDirection ) {
+        pixelnumber = (180-1) - j;
+      } else {
+        pixelnumber = j;
+      }
+      ledky[pixelnumber] = color;
+    }
+    for( int j = 180; j < 210; j++) {
+      // Scale the heat value from 0-255 down to 0-240
+      // for best results with color palettes.
+      byte colorindex = scale8( heat[j], 240);
+      CRGB color = ColorFromPalette( gPal, colorindex);
+      int pixelnumber;
+      if( gReverseDirection ) {
+        pixelnumber = (210-1) - j;
+      } else {
+        pixelnumber = j;
+      }
+      ledky[pixelnumber] = color;
+    }
+}
+
+
+//Podsviceni
+
+
+void animacePodsviceni()
+{
   if(frekvence[0]>=21)
   {
     BasJas=250;
@@ -358,11 +903,7 @@ for (int i = 0;i<7;i++)
   {
     StredyJas=250;
   }
-  else
-  {
-    StredyJas=75;
-  }
-  if(frekvence[3]>=22)
+  else if(frekvence[3]>=22)
   {
     StredyJas=250;
   }
@@ -371,7 +912,11 @@ for (int i = 0;i<7;i++)
     StredyJas=75;
   }
   
-  if(frekvence[4]>=15)
+  if(frekvence[4]>=10)
+  {
+    VyskyJas=250;
+  }
+  else if(frekvence[5]>=6)
   {
     VyskyJas=250;
   }
@@ -379,142 +924,6 @@ for (int i = 0;i<7;i++)
   {
     VyskyJas=75;
   }
-  if(frekvence[5]>=8)
-  {
-    VyskyJas=250;
-  }
-  else
-  {
-    VyskyJas=75;
-  }
-
-  animacePodsviceni();
-  
-  switch(volba)
-  {
-  case 0:
-  {
-    lcd.setCursor(8,1);
-    lcd.print(volba);
-    animace();
-  break;
-  }
-  case 1:
-  {
-    lcd.setCursor(8,1);
-    lcd.print(volba);
-    basy01();
-    basy02();
-    basy03();
-    stredy01();
-    stredy02();
-    vysky01();
-    vysky02();
-   break;
-   }
-   case 2:
-   {
-     lcd.setCursor(8,1);
-     lcd.print(volba);
-     basy11();
-     basy12();
-     basy13();
-     stredy11();
-     stredy12();
-     vysky11();
-     vysky12();
-   break;
-   }
-   case 3:
-   {
-     lcd.setCursor(8,1);
-     lcd.print(volba);
-     basy21();
-     basy22();
-     basy23();
-     stredy21();
-     stredy22();
-     vysky21();
-     vysky22();
-   break;
-   }
-   case 4:
-   {
-     lcd.setCursor(8,1);
-     lcd.print(volba);
-     basybasic1();
-     basybasic2();
-     basybasic3();
-     stredybasic1();
-     stredybasic2();
-     vyskybasic1();
-     vyskybasic2();
-   break;
-   }
-   case 5:
-   {
-     lcd.setCursor(8,1);
-     lcd.print(volba);
-     basybasic11();
-     basybasic12();
-     basybasic13();
-     stredybasic11();
-     stredybasic12();
-     vyskybasic11();
-     vyskybasic12();
-   break;
-   }
-   case 6:
-   {
-     lcd.setCursor(8,1);
-     lcd.print(volba);
-     ledky[0]=CHSV(0,0,0);
-     ledky[30]=CHSV(0,0,0);
-     ledky[60]=CHSV(0,0,0);
-     ledky[90]=CHSV(0,0,0);
-     ledky[120]=CHSV(0,0,0);
-     ledky[150]=CHSV(0,0,0);
-     ledky[180]=CHSV(0,0,0);
-     zBoku1();
-     zBoku2();
-     zBoku3();
-     zBoku4();
-     zBoku5();
-     zBoku6();
-     zBoku7();
-   break;
-   }
- }
-}
-
-void tlacitko1()
-{
-  volba++;
-  if(volba>6)
-    volba=6;
-}
-
-void tlacitko2()
-{
-  volba--;
-  if(volba<0)
-    volba=0;
-}
-
-void animace()
-{
-  startIndexRezim = startIndexRezim + 4;
-  int barevnyIndexRezim=startIndexRezim;
-  for(int i = 0; i<pocetLED; i++) 
-  {
-  ledky[i] = ColorFromPalette(RainbowColors_p, barevnyIndexRezim, jas);
-  barevnyIndexRezim+=6;
-  }
-  FastLED.show();
-}
-
-void animacePodsviceni()
-{
   startIndex=startIndex+5;
   int barevnyIndex=startIndex;
   for(int i=0;i<20;i++) 
@@ -539,944 +948,172 @@ void animacePodsviceni()
   }
 }
 
-void zBoku1()
+void toceniLedekbila()
 {
-  switch(frekvenceZBoku[0])
-  {
-  case 1:
+    for (int q=0; q < 3; q++)
     {
-    for(int i=1;i<=4;i++)
-      ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-    for(int i=31;i<=34;i++)
-      ledky[i]=CHSV(0,0,0);
-    for(int i=61;i<=64;i++)
-     ledky[i]=CHSV(0,0,0);
-    for(int i=91;i<=94;i++)
-      ledky[i]=CHSV(0,0,0);
-    for(int i=121;i<=124;i++)
-      ledky[i]=CHSV(0,0,0);
-    for(int i=151;i<=154;i++)
-      ledky[i]=CHSV(0,0,0);
-    for(int i=181;i<=184;i++)
-      ledky[i]=CHSV(0,0,0);
-    break;
+      for (uint16_t i=0; i < pocetLEDpodsviceni; i=i+3)
+      {
+        ledkyPodsviceni[i+q]=CHSV(255,0,255);    //turn every third pixel on
+      }
+      FastLED.show();
+      delay(50);
+      
+      for (uint16_t i=0; i < pocetLEDpodsviceni; i=i+3) {
+        ledkyPodsviceni[i+q]=CRGB(0,0,0);        //turn every third pixel off
+      }
     }
-  case 2:
-    {
-      for(int i=1;i<=4;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=31;i<=34;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=61;i<=64;i++)
-       ledky[i]=CHSV(0,0,0);
-      for(int i=91;i<=94;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=121;i<=124;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=151;i<=154;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=181;i<=184;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 3:
-    {
-      for(int i=1;i<=4;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=31;i<=34;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=61;i<=64;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=91;i<=94;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=121;i<=124;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=151;i<=154;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=181;i<=184;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 4:
-    {
-      for(int i=1;i<=4;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=31;i<=34;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=61;i<=64;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=91;i<=94;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=121;i<=124;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=151;i<=154;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=181;i<=184;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 5:
-    {
-      for(int i=1;i<=4;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=31;i<=34;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=61;i<=64;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=91;i<=94;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=121;i<=124;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=151;i<=154;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=181;i<=184;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 6:
-    {
-      for(int i=1;i<=4;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=31;i<=34;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=61;i<=64;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=91;i<=94;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=121;i<=124;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=151;i<=154;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=181;i<=184;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 7:
-    {
-      for(int i=1;i<=4;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=31;i<=34;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=61;i<=64;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=91;i<=94;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=121;i<=124;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=151;i<=154;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      for(int i=181;i<=184;i++)
-        ledky[i]=CHSV(frekvenceBarva[0],255,jas);
-      break;
-    }
- }
- FastLED.show();
 }
 
-void zBoku2()
+void toceniLedekbarva()
 {
-  switch(frekvenceZBoku[1])
-  {
-  case 1:
+    for (int q=0; q < 4; q++)
     {
-    for(int i=5;i<=8;i++)
-      ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-    for(int i=35;i<=38;i++)
-      ledky[i]=CHSV(0,0,0);
-    for(int i=65;i<=68;i++)
-     ledky[i]=CHSV(0,0,0);
-    for(int i=95;i<=98;i++)
-      ledky[i]=CHSV(0,0,0);
-    for(int i=125;i<=128;i++)
-      ledky[i]=CHSV(0,0,0);
-    for(int i=155;i<=158;i++)
-      ledky[i]=CHSV(0,0,0);
-    for(int i=185;i<=188;i++)
-      ledky[i]=CHSV(0,0,0);
-    break;
+      for (uint16_t i=0; i < pocetLEDpodsviceni; i=i+4)
+      {
+        ledkyPodsviceni[i+q]=CHSV(0+(10*i),255,255); //turn every third pixel on
+
+      }
+      FastLED.show();
+      delay(50);
+      
+      for (uint16_t i=0; i < pocetLEDpodsviceni; i=i+4) {
+        ledkyPodsviceni[i+q]=CRGB(0,0,0);        //turn every third pixel off
+      }
     }
-  case 2:
-    {
-      for(int i=5;i<=8;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=35;i<=38;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=65;i<=68;i++)
-       ledky[i]=CHSV(0,0,0);
-      for(int i=95;i<=98;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=125;i<=128;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=155;i<=158;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=185;i<=188;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 3:
-    {
-      for(int i=5;i<=8;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=35;i<=38;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=65;i<=68;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=95;i<=98;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=125;i<=128;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=155;i<=158;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=185;i<=188;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 4:
-    {
-      for(int i=5;i<=8;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=35;i<=38;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=65;i<=68;i++)
-       ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=95;i<=98;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=125;i<=128;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=155;i<=158;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=185;i<=188;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 5:
-    {
-      for(int i=5;i<=8;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=35;i<=38;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=65;i<=68;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=95;i<=98;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=125;i<=128;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=155;i<=158;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=185;i<=188;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 6:
-    {
-      for(int i=5;i<=8;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-       for(int i=35;i<=38;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=65;i<=68;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=95;i<=98;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=125;i<=128;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=155;i<=158;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=185;i<=188;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 7:
-    {
-      for(int i=5;i<=8;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=35;i<=38;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=65;i<=68;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=95;i<=98;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=125;i<=128;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=155;i<=158;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      for(int i=185;i<=188;i++)
-        ledky[i]=CHSV(frekvenceBarva[1],255,jas);
-      break;
-    }
- }
- FastLED.show();
 }
 
-void zBoku3()
+void prolinani()
 {
-  switch(frekvenceZBoku[2])
+  startIndexRezim++;
+  int barevnyIndexRezim=startIndexRezim;
+  for(int i=0;i<pocetLEDpodsviceni;i++) 
   {
-  case 1:
-    {
-    for(int i=9;i<=12;i++)
-      ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-    for(int i=39;i<=42;i++)
-      ledky[i]=CHSV(0,0,0);
-    for(int i=69;i<=72;i++)
-     ledky[i]=CHSV(0,0,0);
-    for(int i=99;i<=102;i++)
-      ledky[i]=CHSV(0,0,0);
-    for(int i=129;i<=132;i++)
-      ledky[i]=CHSV(0,0,0);
-    for(int i=159;i<=162;i++)
-      ledky[i]=CHSV(0,0,0);
-    for(int i=189;i<=192;i++)
-      ledky[i]=CHSV(0,0,0);
-    break;
-    }
-  case 2:
-    {
-      for(int i=9;i<=12;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=39;i<=42;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=69;i<=72;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=99;i<=102;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=129;i<=132;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=159;i<=162;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=189;i<=192;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 3:
-    {
-      for(int i=9;i<=12;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=39;i<=42;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=69;i<=72;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=99;i<=102;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=129;i<=132;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=159;i<=162;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=189;i<=192;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 4:
-    {
-      for(int i=9;i<=12;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=39;i<=42;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=69;i<=72;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=99;i<=102;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=129;i<=132;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=159;i<=162;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=189;i<=192;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 5:
-    {
-      for(int i=9;i<=12;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=39;i<=42;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=69;i<=72;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=99;i<=102;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=129;i<=132;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=159;i<=162;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=189;i<=192;i++)
-        ledky[i]=CHSV(0,0,0);
-     break;
-    }
-  case 6:
-    {
-      for(int i=9;i<=12;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=39;i<=42;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=69;i<=72;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=99;i<=102;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=129;i<=132;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=159;i<=162;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=189;i<=192;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 7:
-    {
-     for(int i=9;i<=12;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=39;i<=42;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=69;i<=72;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=99;i<=102;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=129;i<=132;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=159;i<=162;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      for(int i=189;i<=192;i++)
-        ledky[i]=CHSV(frekvenceBarva[2],255,jas);
-      break;
-    }
- }
- FastLED.show();
+    ledkyPodsviceni[i] = ColorFromPalette(RainbowColors_p, barevnyIndexRezim, JAS);
+    JAS=JAS-10;
+    barevnyIndexRezim+=10;
+  }
+  FastLED.show();
+  delay(5);
 }
 
-void zBoku4()
+void rainbow() 
 {
-  switch(frekvenceZBoku[3])
-  {
-  case 1:
-    {
-     for(int i=13;i<=16;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=43;i<=46;i++)
-       ledky[i]=CHSV(0,0,0);
-     for(int i=73;i<=76;i++)
-       ledky[i]=CHSV(0,0,0);
-     for(int i=103;i<=106;i++)
-       ledky[i]=CHSV(0,0,0);
-     for(int i=133;i<=136;i++)
-       ledky[i]=CHSV(0,0,0);
-     for(int i=163;i<=166;i++)
-       ledky[i]=CHSV(0,0,0);
-     for(int i=193;i<=196;i++)
-       ledky[i]=CHSV(0,0,0);
-    break;
-    }
-  case 2:
-    {
-     for(int i=13;i<=16;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=43;i<=46;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=73;i<=76;i++)
-       ledky[i]=CHSV(0,0,0);
-     for(int i=103;i<=106;i++)
-       ledky[i]=CHSV(0,0,0);
-     for(int i=133;i<=136;i++)
-       ledky[i]=CHSV(0,0,0);
-     for(int i=163;i<=166;i++)
-       ledky[i]=CHSV(0,0,0);
-     for(int i=193;i<=196;i++)
-       ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 3:
-    {
-     for(int i=13;i<=16;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=43;i<=46;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=73;i<=76;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=103;i<=106;i++)
-       ledky[i]=CHSV(0,0,0);
-     for(int i=133;i<=136;i++)
-       ledky[i]=CHSV(0,0,0);
-     for(int i=163;i<=166;i++)
-       ledky[i]=CHSV(0,0,0);
-     for(int i=193;i<=196;i++)
-       ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 4:
-    {
-     for(int i=13;i<=16;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=43;i<=46;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=73;i<=76;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=103;i<=106;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=133;i<=136;i++)
-       ledky[i]=CHSV(0,0,0);
-     for(int i=163;i<=166;i++)
-       ledky[i]=CHSV(0,0,0);
-     for(int i=193;i<=196;i++)
-       ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 5:
-    {
-     for(int i=13;i<=16;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=43;i<=46;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=73;i<=76;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=103;i<=106;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=133;i<=136;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=163;i<=166;i++)
-       ledky[i]=CHSV(0,0,0);
-     for(int i=193;i<=196;i++)
-       ledky[i]=CHSV(0,0,0);
-     break;
-    }
-  case 6:
-    {
-     for(int i=13;i<=16;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=43;i<=46;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=73;i<=76;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=103;i<=106;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=133;i<=136;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=163;i<=166;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=193;i<=196;i++)
-       ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 7:
-    {
-     for(int i=13;i<=16;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=43;i<=46;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=73;i<=76;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=103;i<=106;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=133;i<=136;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=163;i<=166;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     for(int i=193;i<=196;i++)
-       ledky[i]=CHSV(frekvenceBarva[3],255,jas);
-     break;
-    }
- }
- FastLED.show();
+  // FastLED's built-in rainbow generator
+  fill_rainbow( ledkyPodsviceni, pocetLEDpodsviceni, 0, 5);
 }
 
-void zBoku5()
+void rainbowWithGlitter()
 {
-  switch(frekvenceZBoku[4])
-  {
-  case 1:
-    {
-      for(int i=17;i<=20;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=47;i<=50;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=77;i<=80;i++)
-       ledky[i]=CHSV(0,0,0);
-      for(int i=107;i<=110;i++)
-       ledky[i]=CHSV(0,0,0);
-      for(int i=137;i<=140;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=167;i<=170;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=197;i<=200;i++)
-        ledky[i]=CHSV(0,0,0);
-    break;
-    }
-  case 2:
-    {
-      for(int i=17;i<=20;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=47;i<=50;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=77;i<=80;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=107;i<=110;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=137;i<=140;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=167;i<=170;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=197;i<=200;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 3:
-    {
-      for(int i=17;i<=20;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=47;i<=50;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=77;i<=80;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=107;i<=110;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=137;i<=140;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=167;i<=170;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=197;i<=200;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 4:
-    {
-      for(int i=17;i<=20;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=47;i<=50;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=77;i<=80;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=107;i<=110;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=137;i<=140;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=167;i<=170;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=197;i<=200;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 5:
-    {
-      for(int i=17;i<=20;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=47;i<=50;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=77;i<=80;i++)
-       ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=107;i<=110;i++)
-       ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=137;i<=140;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=167;i<=170;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=197;i<=200;i++)
-        ledky[i]=CHSV(0,0,0);
-     break;
-    }
-  case 6:
-    {
-      for(int i=17;i<=20;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=47;i<=50;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=77;i<=80;i++)
-       ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=107;i<=110;i++)
-       ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=137;i<=140;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=167;i<=170;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=197;i<=200;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 7:
-    {
-      for(int i=17;i<=20;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=47;i<=50;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=77;i<=80;i++)
-       ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=107;i<=110;i++)
-       ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=137;i<=140;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=167;i<=170;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-      for(int i=197;i<=200;i++)
-        ledky[i]=CHSV(frekvenceBarva[4],255,jas);
-     break;
-    }
- }
- FastLED.show();
+  // built-in FastLED rainbow, plus some random sparkly glitter
+  rainbow();
+  addGlitter(85);
+  FastLED.show();
 }
-
-void zBoku6()
+ 
+void addGlitter( fract8 chanceOfGlitter) 
 {
-  switch(frekvenceZBoku[5])
-  {
-  case 1:
-    {
-      for(int i=21;i<=24;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=51;i<=54;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=81;i<=84;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=111;i<=114;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=141;i<=144;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=171;i<=174;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=201;i<=204;i++)
-        ledky[i]=CHSV(0,0,0);
-    break;
-    }
-  case 2:
-    {
-      for(int i=21;i<=24;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=51;i<=54;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=81;i<=84;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=111;i<=114;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=141;i<=144;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=171;i<=174;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=201;i<=204;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 3:
-    {
-      for(int i=21;i<=24;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=51;i<=54;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=81;i<=84;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=111;i<=114;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=141;i<=144;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=171;i<=174;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=201;i<=204;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 4:
-    {
-      for(int i=21;i<=24;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=51;i<=54;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=81;i<=84;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=111;i<=114;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=141;i<=144;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=171;i<=174;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=201;i<=204;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 5:
-    {
-      for(int i=21;i<=24;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=51;i<=54;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=81;i<=84;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=111;i<=114;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=141;i<=144;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=171;i<=174;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=201;i<=204;i++)
-        ledky[i]=CHSV(0,0,0);
-     break;
-    }
-  case 6:
-    {
-      for(int i=21;i<=24;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=51;i<=54;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=81;i<=84;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=111;i<=114;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=141;i<=144;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=171;i<=174;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=201;i<=204;i++)
-        ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 7:
-    {
-      for(int i=21;i<=24;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=51;i<=54;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=81;i<=84;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=111;i<=114;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=141;i<=144;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=171;i<=174;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-      for(int i=201;i<=204;i++)
-        ledky[i]=CHSV(frekvenceBarva[5],255,jas);
-     break;
-    }
- }
- FastLED.show();
+  if( random8() < chanceOfGlitter) {
+    ledkyPodsviceni[ random16(pocetLEDpodsviceni) ] += CRGB::White;
+  }
 }
-
-void zBoku7()
+ 
+void confetti()
 {
-  switch(frekvenceZBoku[6])
-  {
-  case 1:
-    {
-      for(int i=25;i<=28;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=55;i<=58;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=85;i<=88;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=115;i<=118;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=145;i<=148;i++)
-         ledky[i]=CHSV(0,0,0);
-      for(int i=175;i<=178;i++)
-         ledky[i]=CHSV(0,0,0);
-       for(int i=205;i<=208;i++)
-         ledky[i]=CHSV(0,0,0);
-    break;
-    }
-  case 2:
-    {
-      for(int i=25;i<=28;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=55;i<=58;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=85;i<=88;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=115;i<=118;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=145;i<=148;i++)
-         ledky[i]=CHSV(0,0,0);
-      for(int i=175;i<=178;i++)
-         ledky[i]=CHSV(0,0,0);
-       for(int i=205;i<=208;i++)
-         ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 3:
-    {
-      for(int i=25;i<=28;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=55;i<=58;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=85;i<=88;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=115;i<=118;i++)
-        ledky[i]=CHSV(0,0,0);
-      for(int i=145;i<=148;i++)
-         ledky[i]=CHSV(0,0,0);
-      for(int i=175;i<=178;i++)
-         ledky[i]=CHSV(0,0,0);
-       for(int i=205;i<=208;i++)
-         ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 4:
-    {
-      for(int i=25;i<=28;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=55;i<=58;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=85;i<=88;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=115;i<=118;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=145;i<=148;i++)
-         ledky[i]=CHSV(0,0,0);
-      for(int i=175;i<=178;i++)
-         ledky[i]=CHSV(0,0,0);
-       for(int i=205;i<=208;i++)
-         ledky[i]=CHSV(0,0,0);
-      break;
-    }
-  case 5:
-    {
-      for(int i=25;i<=28;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=55;i<=58;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=85;i<=88;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=115;i<=118;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=145;i<=148;i++)
-         ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=175;i<=178;i++)
-         ledky[i]=CHSV(0,0,0);
-       for(int i=205;i<=208;i++)
-         ledky[i]=CHSV(0,0,0);
-     break;
-    }
-  case 6:
-    {
-      for(int i=25;i<=28;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=55;i<=58;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=85;i<=88;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=115;i<=118;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=145;i<=148;i++)
-         ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=175;i<=178;i++)
-         ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-       for(int i=205;i<=208;i++)
-         ledky[i]=CHSV(0,0,0);
-      break;
-    }
-
-  case 7:
-    {
-      for(int i=25;i<=28;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=55;i<=58;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=85;i<=88;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=115;i<=118;i++)
-        ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=145;i<=148;i++)
-         ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-      for(int i=175;i<=178;i++)
-         ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-       for(int i=205;i<=208;i++)
-         ledky[i]=CHSV(frekvenceBarva[6],255,jas);
-     break;
-    }
- }
- FastLED.show();
+  // random colored speckles that blink in and fade smoothly
+  fadeToBlackBy( ledkyPodsviceni, pocetLEDpodsviceni, 10);
+  int pos = random16(pocetLEDpodsviceni);
+  ledkyPodsviceni[pos] += CHSV( gHue + random8(64), 200, 255);
+  delay(10);
+  FastLED.show();
 }
+ 
+void sinelon()
+{
+  // a colored dot sweeping back and forth, with fading trails
+  fadeToBlackBy( ledkyPodsviceni, pocetLEDpodsviceni, 4);
+  int pos = beatsin16( 12, 0, pocetLEDpodsviceni-1 );
+  ledkyPodsviceni[pos] += CHSV(gHue, 255, 192);
+  FastLED.show();
+}
+ 
+void bpm()
+{
+  // colored stripes pulsing at a defined Beats-Per-Minute (BPM)
+  uint8_t BeatsPerMinute = 62;
+  CRGBPalette16 palette = PartyColors_p;
+  uint8_t beat = beatsin8( BeatsPerMinute, 64, 255);
+  for( int i = 0; i < pocetLEDpodsviceni; i++) { //9948
+    ledkyPodsviceni[i] = ColorFromPalette(moje, 5+(i*2), beat-5+(i*10));
+  }
+  FastLED.show();
+}
+ 
+void juggle()
+{
+  // eight colored dots, weaving in and out of sync with each other
+  fadeToBlackBy( ledkyPodsviceni, pocetLEDpodsviceni, 20);
+  byte dothue = 0;
+  for( int i = 0; i < 8; i++) {
+    ledkyPodsviceni[beatsin16( i+7, 0, pocetLEDpodsviceni-1 )] |= CHSV(dothue, 200, 255);
+    dothue += 32;
+  }
+  FastLED.show();
+}
+ 
+
+void second_light()
+{
+  static uint8_t hue = 0;
+   for(int whiteLed = 0; whiteLed < pocetLEDpodsviceni; whiteLed = whiteLed + 1) {
+      // Turn our current led on to white, then show the ledkyPodsviceni
+      ledkyPodsviceni[whiteLed] =  CHSV(hue++, 255, 255);
+ 
+      // Show the ledkyPodsviceni (only one of which is set to white, from above)
+      FastLED.show();
+ 
+      // Wait a little bit
+      delay(20);
+ 
+      // Turn our current led back to black for the next loop around
+      ledkyPodsviceni[whiteLed] = CHSV(hue++, 255, 255);
+   }
+}
+void cylon()
+{
+    static uint8_t hue = 0;
+ // Serial.print("x");
+  // First slide the led in one direction
+  for(int i = 0; i < pocetLEDpodsviceni; i++) {
+    // Set the i'th led to red 
+    ledkyPodsviceni[i] = CHSV(hue++, 255, 255);
+    // Show the ledkyPodsviceni
+    FastLED.show(); 
+    // now that we've shown the ledkyPodsviceni, reset the i'th led to black
+    // ledkyPodsviceni[i] = CRGB::Black;
+    fadeall();
+    // Wait a little bit before we loop around and do it again
+    delay(5);
+  }
+  //Serial.print("x");
+ 
+  // Now go in the other direction.  
+  for(int i = (pocetLEDpodsviceni)-1; i >= 0; i--) {
+    // Set the i'th led to red 
+    ledkyPodsviceni[i] = CHSV(hue++, 255, 255);
+    // Show the ledkyPodsviceni
+    FastLED.show();
+    // now that we've shown the ledkyPodsviceni, reset the i'th led to black
+    // ledkyPodsviceni[i] = CRGB::Black;
+    fadeall();
+    // Wait a little bit before we loop around and do it again
+    delay(5);
+  }
+}
+void fadeall() { for(int i = 0; i < pocetLEDpodsviceni; i++) { ledkyPodsviceni[i].nscale8(250); } }
+
+
+
 
 //Všechny níže zmíněné proměnné jsou očíslovány, protože nebylo možné používat jen jednu proměnnou
 void basy01()
@@ -2028,7 +1665,10 @@ void basy21()
 
       if(aktualniMillis1-predchoziMillis1>padani)
       {
-        poslednipeak1--;
+        if(poslednipeak1>i)
+          poslednipeak1--;
+        else
+          poslednipeak1=0;
         predchoziMillis1=aktualniMillis1;
       }
       ledky[poslednipeak1]=CHSV(50+barvaTecky,255,jas);
@@ -2055,7 +1695,10 @@ void basy22()
 
       if(aktualniMillis2-predchoziMillis2>padani)
       {
-        poslednipeak2--;
+        if(poslednipeak2>i)
+          poslednipeak2--;
+        else
+          poslednipeak2=30;
         predchoziMillis2=aktualniMillis2;
       }
       ledky[poslednipeak2]=CHSV(100+barvaTecky,255,jas);
@@ -2082,7 +1725,10 @@ void basy23()
 
       if(aktualniMillis3-predchoziMillis3>padani)
       {
-        poslednipeak3--;
+        if(poslednipeak3>i)
+          poslednipeak3--;
+        else
+          poslednipeak3=60;
         predchoziMillis3=aktualniMillis3;
       }
       ledky[poslednipeak3]=CHSV(200+barvaTecky,255,jas);
@@ -2109,7 +1755,10 @@ void stredy21()
 
       if(aktualniMillis4-predchoziMillis4>padani)
       {
-        poslednipeak4--;
+        if(poslednipeak4>i)
+          poslednipeak4--;
+        else
+          poslednipeak4=90;
         predchoziMillis4=aktualniMillis4;
       }
       ledky[poslednipeak4]=CHSV(30+barvaTecky,255,jas);
@@ -2136,7 +1785,10 @@ void stredy22()
 
       if(aktualniMillis5-predchoziMillis5>padani)
       {
-        poslednipeak5--;
+        if(poslednipeak5>i)
+          poslednipeak5--;
+        else
+          poslednipeak5=120;
         predchoziMillis5=aktualniMillis5;
       }
       ledky[poslednipeak5]=CHSV(0+barvaTecky,255,jas);
@@ -2163,7 +1815,10 @@ void vysky21()
 
       if(aktualniMillis6-predchoziMillis6>padani)
       {
-        poslednipeak6--;
+        if(poslednipeak6>i)
+          poslednipeak6--;
+        else
+          poslednipeak6=150;
         predchoziMillis6=aktualniMillis6;
       }
       ledky[poslednipeak6]=CHSV(120+barvaTecky,255,jas);
@@ -2189,7 +1844,10 @@ void vysky22()
 
       if(aktualniMillis7-predchoziMillis7>padani)
       {
-        poslednipeak7--;
+        if(poslednipeak7>i)
+          poslednipeak7--;
+        else
+          poslednipeak7=180;
         predchoziMillis7=aktualniMillis7;
       }
       ledky[poslednipeak7]=CHSV(80+barvaTecky,255,jas); 
@@ -2354,4 +2012,943 @@ void vyskybasic12()
         ledky[i] = CHSV(0,0,0);
     }
 FastLED.show();
+}
+
+void zBoku1()
+{
+  switch(frekvenceZBoku[0])
+  {
+  case 1:
+    {
+    for(int i=1;i<=4;i++)
+      ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+    for(int i=31;i<=34;i++)
+      ledky[i]=CHSV(0,0,0);
+    for(int i=61;i<=64;i++)
+     ledky[i]=CHSV(0,0,0);
+    for(int i=91;i<=94;i++)
+      ledky[i]=CHSV(0,0,0);
+    for(int i=121;i<=124;i++)
+      ledky[i]=CHSV(0,0,0);
+    for(int i=151;i<=154;i++)
+      ledky[i]=CHSV(0,0,0);
+    for(int i=181;i<=184;i++)
+      ledky[i]=CHSV(0,0,0);
+    break;
+    }
+  case 2:
+    {
+      for(int i=1;i<=4;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=31;i<=34;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=61;i<=64;i++)
+       ledky[i]=CHSV(0,0,0);
+      for(int i=91;i<=94;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=121;i<=124;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=151;i<=154;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=181;i<=184;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 3:
+    {
+      for(int i=1;i<=4;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=31;i<=34;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=61;i<=64;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=91;i<=94;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=121;i<=124;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=151;i<=154;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=181;i<=184;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 4:
+    {
+      for(int i=1;i<=4;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=31;i<=34;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=61;i<=64;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=91;i<=94;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=121;i<=124;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=151;i<=154;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=181;i<=184;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 5:
+    {
+      for(int i=1;i<=4;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=31;i<=34;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=61;i<=64;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=91;i<=94;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=121;i<=124;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=151;i<=154;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=181;i<=184;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 6:
+    {
+      for(int i=1;i<=4;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=31;i<=34;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=61;i<=64;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=91;i<=94;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=121;i<=124;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=151;i<=154;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=181;i<=184;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 7:
+    {
+      for(int i=1;i<=4;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=31;i<=34;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=61;i<=64;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=91;i<=94;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=121;i<=124;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=151;i<=154;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=181;i<=184;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      break;
+    }
+ }
+ FastLED.show();
+}
+
+void zBoku2()
+{
+  switch(frekvenceZBoku[1])
+  {
+  case 1:
+    {
+    for(int i=5;i<=8;i++)
+      ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+    for(int i=35;i<=38;i++)
+      ledky[i]=CHSV(0,0,0);
+    for(int i=65;i<=68;i++)
+     ledky[i]=CHSV(0,0,0);
+    for(int i=95;i<=98;i++)
+      ledky[i]=CHSV(0,0,0);
+    for(int i=125;i<=128;i++)
+      ledky[i]=CHSV(0,0,0);
+    for(int i=155;i<=158;i++)
+      ledky[i]=CHSV(0,0,0);
+    for(int i=185;i<=188;i++)
+      ledky[i]=CHSV(0,0,0);
+    break;
+    }
+  case 2:
+    {
+      for(int i=5;i<=8;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=35;i<=38;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=65;i<=68;i++)
+       ledky[i]=CHSV(0,0,0);
+      for(int i=95;i<=98;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=125;i<=128;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=155;i<=158;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=185;i<=188;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 3:
+    {
+      for(int i=5;i<=8;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=35;i<=38;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=65;i<=68;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=95;i<=98;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=125;i<=128;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=155;i<=158;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=185;i<=188;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 4:
+    {
+      for(int i=5;i<=8;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=35;i<=38;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=65;i<=68;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=95;i<=98;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=125;i<=128;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=155;i<=158;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=185;i<=188;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 5:
+    {
+      for(int i=5;i<=8;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=35;i<=38;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=65;i<=68;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=95;i<=98;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=125;i<=128;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=155;i<=158;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=185;i<=188;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 6:
+    {
+      for(int i=5;i<=8;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+       for(int i=35;i<=38;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=65;i<=68;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=95;i<=98;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=125;i<=128;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=155;i<=158;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=185;i<=188;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 7:
+    {
+      for(int i=5;i<=8;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=35;i<=38;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=65;i<=68;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=95;i<=98;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=125;i<=128;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=155;i<=158;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=185;i<=188;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      break;
+    }
+ }
+ FastLED.show();
+}
+
+void zBoku3()
+{
+  switch(frekvenceZBoku[2])
+  {
+  case 1:
+    {
+    for(int i=9;i<=12;i++)
+      ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+    for(int i=39;i<=42;i++)
+      ledky[i]=CHSV(0,0,0);
+    for(int i=69;i<=72;i++)
+     ledky[i]=CHSV(0,0,0);
+    for(int i=99;i<=102;i++)
+      ledky[i]=CHSV(0,0,0);
+    for(int i=129;i<=132;i++)
+      ledky[i]=CHSV(0,0,0);
+    for(int i=159;i<=162;i++)
+      ledky[i]=CHSV(0,0,0);
+    for(int i=189;i<=192;i++)
+      ledky[i]=CHSV(0,0,0);
+    break;
+    }
+  case 2:
+    {
+      for(int i=9;i<=12;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=39;i<=42;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=69;i<=72;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=99;i<=102;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=129;i<=132;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=159;i<=162;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=189;i<=192;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 3:
+    {
+      for(int i=9;i<=12;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=39;i<=42;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=69;i<=72;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=99;i<=102;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=129;i<=132;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=159;i<=162;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=189;i<=192;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 4:
+    {
+      for(int i=9;i<=12;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=39;i<=42;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=69;i<=72;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=99;i<=102;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=129;i<=132;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=159;i<=162;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=189;i<=192;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 5:
+    {
+      for(int i=9;i<=12;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=39;i<=42;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=69;i<=72;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=99;i<=102;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=129;i<=132;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=159;i<=162;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=189;i<=192;i++)
+        ledky[i]=CHSV(0,0,0);
+     break;
+    }
+  case 6:
+    {
+      for(int i=9;i<=12;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=39;i<=42;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=69;i<=72;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=99;i<=102;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=129;i<=132;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=159;i<=162;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=189;i<=192;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 7:
+    {
+     for(int i=9;i<=12;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=39;i<=42;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=69;i<=72;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=99;i<=102;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=129;i<=132;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=159;i<=162;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=189;i<=192;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      break;
+    }
+ }
+ FastLED.show();
+}
+
+void zBoku4()
+{
+  switch(frekvenceZBoku[3])
+  {
+  case 1:
+    {
+     for(int i=13;i<=16;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=43;i<=46;i++)
+       ledky[i]=CHSV(0,0,0);
+     for(int i=73;i<=76;i++)
+       ledky[i]=CHSV(0,0,0);
+     for(int i=103;i<=106;i++)
+       ledky[i]=CHSV(0,0,0);
+     for(int i=133;i<=136;i++)
+       ledky[i]=CHSV(0,0,0);
+     for(int i=163;i<=166;i++)
+       ledky[i]=CHSV(0,0,0);
+     for(int i=193;i<=196;i++)
+       ledky[i]=CHSV(0,0,0);
+    break;
+    }
+  case 2:
+    {
+     for(int i=13;i<=16;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=43;i<=46;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=73;i<=76;i++)
+       ledky[i]=CHSV(0,0,0);
+     for(int i=103;i<=106;i++)
+       ledky[i]=CHSV(0,0,0);
+     for(int i=133;i<=136;i++)
+       ledky[i]=CHSV(0,0,0);
+     for(int i=163;i<=166;i++)
+       ledky[i]=CHSV(0,0,0);
+     for(int i=193;i<=196;i++)
+       ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 3:
+    {
+     for(int i=13;i<=16;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=43;i<=46;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=73;i<=76;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=103;i<=106;i++)
+       ledky[i]=CHSV(0,0,0);
+     for(int i=133;i<=136;i++)
+       ledky[i]=CHSV(0,0,0);
+     for(int i=163;i<=166;i++)
+       ledky[i]=CHSV(0,0,0);
+     for(int i=193;i<=196;i++)
+       ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 4:
+    {
+     for(int i=13;i<=16;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=43;i<=46;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=73;i<=76;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=103;i<=106;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=133;i<=136;i++)
+       ledky[i]=CHSV(0,0,0);
+     for(int i=163;i<=166;i++)
+       ledky[i]=CHSV(0,0,0);
+     for(int i=193;i<=196;i++)
+       ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 5:
+    {
+     for(int i=13;i<=16;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=43;i<=46;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=73;i<=76;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=103;i<=106;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=133;i<=136;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=163;i<=166;i++)
+       ledky[i]=CHSV(0,0,0);
+     for(int i=193;i<=196;i++)
+       ledky[i]=CHSV(0,0,0);
+     break;
+    }
+  case 6:
+    {
+     for(int i=13;i<=16;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=43;i<=46;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=73;i<=76;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=103;i<=106;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=133;i<=136;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=163;i<=166;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=193;i<=196;i++)
+       ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 7:
+    {
+     for(int i=13;i<=16;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=43;i<=46;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=73;i<=76;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=103;i<=106;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=133;i<=136;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=163;i<=166;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     for(int i=193;i<=196;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     break;
+    }
+ }
+ FastLED.show();
+}
+
+void zBoku5()
+{
+  switch(frekvenceZBoku[4])
+  {
+  case 1:
+    {
+      for(int i=17;i<=20;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=47;i<=50;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=77;i<=80;i++)
+       ledky[i]=CHSV(0,0,0);
+      for(int i=107;i<=110;i++)
+       ledky[i]=CHSV(0,0,0);
+      for(int i=137;i<=140;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=167;i<=170;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=197;i<=200;i++)
+        ledky[i]=CHSV(0,0,0);
+    break;
+    }
+  case 2:
+    {
+      for(int i=17;i<=20;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=47;i<=50;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=77;i<=80;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=107;i<=110;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=137;i<=140;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=167;i<=170;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=197;i<=200;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 3:
+    {
+      for(int i=17;i<=20;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=47;i<=50;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=77;i<=80;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=107;i<=110;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=137;i<=140;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=167;i<=170;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=197;i<=200;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 4:
+    {
+      for(int i=17;i<=20;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=47;i<=50;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=77;i<=80;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=107;i<=110;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=137;i<=140;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=167;i<=170;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=197;i<=200;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 5:
+    {
+      for(int i=17;i<=20;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=47;i<=50;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=77;i<=80;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=107;i<=110;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=137;i<=140;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=167;i<=170;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=197;i<=200;i++)
+        ledky[i]=CHSV(0,0,0);
+     break;
+    }
+  case 6:
+    {
+      for(int i=17;i<=20;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=47;i<=50;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=77;i<=80;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=107;i<=110;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=137;i<=140;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=167;i<=170;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=197;i<=200;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 7:
+    {
+      for(int i=17;i<=20;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=47;i<=50;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=77;i<=80;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=107;i<=110;i++)
+       ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=137;i<=140;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=167;i<=170;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=197;i<=200;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     break;
+    }
+ }
+ FastLED.show();
+}
+
+void zBoku6()
+{
+  switch(frekvenceZBoku[5])
+  {
+  case 1:
+    {
+      for(int i=21;i<=24;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=51;i<=54;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=81;i<=84;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=111;i<=114;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=141;i<=144;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=171;i<=174;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=201;i<=204;i++)
+        ledky[i]=CHSV(0,0,0);
+    break;
+    }
+  case 2:
+    {
+      for(int i=21;i<=24;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=51;i<=54;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=81;i<=84;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=111;i<=114;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=141;i<=144;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=171;i<=174;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=201;i<=204;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 3:
+    {
+      for(int i=21;i<=24;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=51;i<=54;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=81;i<=84;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=111;i<=114;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=141;i<=144;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=171;i<=174;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=201;i<=204;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 4:
+    {
+      for(int i=21;i<=24;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=51;i<=54;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=81;i<=84;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=111;i<=114;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=141;i<=144;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=171;i<=174;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=201;i<=204;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 5:
+    {
+      for(int i=21;i<=24;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=51;i<=54;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=81;i<=84;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=111;i<=114;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=141;i<=144;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=171;i<=174;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=201;i<=204;i++)
+        ledky[i]=CHSV(0,0,0);
+     break;
+    }
+  case 6:
+    {
+      for(int i=21;i<=24;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=51;i<=54;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=81;i<=84;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=111;i<=114;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=141;i<=144;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=171;i<=174;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=201;i<=204;i++)
+        ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 7:
+    {
+      for(int i=21;i<=24;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=51;i<=54;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=81;i<=84;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=111;i<=114;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=141;i<=144;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=171;i<=174;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=201;i<=204;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     break;
+    }
+ }
+ FastLED.show();
+}
+
+void zBoku7()
+{
+  switch(frekvenceZBoku[6])
+  {
+  case 1:
+    {
+      for(int i=25;i<=28;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=55;i<=58;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=85;i<=88;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=115;i<=118;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=145;i<=148;i++)
+         ledky[i]=CHSV(0,0,0);
+      for(int i=175;i<=178;i++)
+         ledky[i]=CHSV(0,0,0);
+       for(int i=205;i<=208;i++)
+         ledky[i]=CHSV(0,0,0);
+    break;
+    }
+  case 2:
+    {
+      for(int i=25;i<=28;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=55;i<=58;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=85;i<=88;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=115;i<=118;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=145;i<=148;i++)
+         ledky[i]=CHSV(0,0,0);
+      for(int i=175;i<=178;i++)
+         ledky[i]=CHSV(0,0,0);
+       for(int i=205;i<=208;i++)
+         ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 3:
+    {
+      for(int i=25;i<=28;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=55;i<=58;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=85;i<=88;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=115;i<=118;i++)
+        ledky[i]=CHSV(0,0,0);
+      for(int i=145;i<=148;i++)
+         ledky[i]=CHSV(0,0,0);
+      for(int i=175;i<=178;i++)
+         ledky[i]=CHSV(0,0,0);
+       for(int i=205;i<=208;i++)
+         ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 4:
+    {
+      for(int i=25;i<=28;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=55;i<=58;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=85;i<=88;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=115;i<=118;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=145;i<=148;i++)
+         ledky[i]=CHSV(0,0,0);
+      for(int i=175;i<=178;i++)
+         ledky[i]=CHSV(0,0,0);
+       for(int i=205;i<=208;i++)
+         ledky[i]=CHSV(0,0,0);
+      break;
+    }
+  case 5:
+    {
+      for(int i=25;i<=28;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=55;i<=58;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=85;i<=88;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=115;i<=118;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=145;i<=148;i++)
+         ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=175;i<=178;i++)
+         ledky[i]=CHSV(0,0,0);
+       for(int i=205;i<=208;i++)
+         ledky[i]=CHSV(0,0,0);
+     break;
+    }
+  case 6:
+    {
+      for(int i=25;i<=28;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=55;i<=58;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=85;i<=88;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=115;i<=118;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=145;i<=148;i++)
+         ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=175;i<=178;i++)
+         ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+       for(int i=205;i<=208;i++)
+         ledky[i]=CHSV(0,0,0);
+      break;
+    }
+
+  case 7:
+    {
+      for(int i=25;i<=28;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=55;i<=58;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=85;i<=88;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=115;i<=118;i++)
+        ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=145;i<=148;i++)
+         ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+      for(int i=175;i<=178;i++)
+         ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+       for(int i=205;i<=208;i++)
+         ledky[i]=CHSV(barva+(barevnyIndex*i),255,jas);
+     break;
+    }
+ }
+ FastLED.show();
 }
